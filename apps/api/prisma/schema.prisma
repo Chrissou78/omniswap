@@ -1,0 +1,662 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Tenant {
+  id            String          @id @default(uuid())
+  name          String
+  slug          String          @unique
+  status        String          @default("active")
+  plan          String          @default("starter")
+  domains       String[]
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  dcaStrategies DCAStrategy[]
+  limitOrders   LimitOrder[]
+  swaps         Swap[]
+  admins        TenantAdmin[]
+  apiKeys       TenantApiKey[]
+  config        TenantConfig?
+  revenue       TenantRevenue[]
+  tokens        TenantToken[]
+}
+
+model TenantConfig {
+  tenantId     String   @id
+  branding     Json     @default("{}")
+  theme        Json     @default("{}")
+  features     Json     @default("{}")
+  fees         Json     @default("{}")
+  tokens       Json     @default("{}")
+  localization Json     @default("{}")
+  legal        Json     @default("{}")
+  updatedAt    DateTime @updatedAt
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model TenantAdmin {
+  id           String    @id @default(uuid())
+  tenantId     String
+  email        String
+  passwordHash String
+  role         String    @default("admin")
+  permissions  Json      @default("{}")
+  mfaEnabled   Boolean   @default(false)
+  mfaSecret    String?
+  lastLogin    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  tenant       Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, email])
+}
+
+model TenantApiKey {
+  id          String    @id @default(uuid())
+  tenantId    String
+  name        String
+  keyHash     String
+  keyPrefix   String
+  permissions Json      @default("{}")
+  rateLimit   Int       @default(1000)
+  lastUsed    DateTime?
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model TenantToken {
+  id          Int      @id @default(autoincrement())
+  tenantId    String
+  chainId     String
+  address     String
+  symbol      String
+  name        String?
+  decimals    Int
+  logoUrl     String?
+  coingeckoId String?
+  verified    Boolean  @default(false)
+  metadata    Json     @default("{}")
+  addedBy     String?
+  addedAt     DateTime @default(now())
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, chainId, address])
+}
+
+model TenantRevenue {
+  id              Int      @id @default(autoincrement())
+  tenantId        String
+  date            DateTime @db.Date
+  chainId         String
+  swapCount       Int      @default(0)
+  volumeUsd       Decimal  @default(0) @db.Decimal(20, 2)
+  platformFeesUsd Decimal  @default(0) @db.Decimal(20, 2)
+  tenantFeesUsd   Decimal  @default(0) @db.Decimal(20, 2)
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, date, chainId])
+}
+
+model Token {
+  id           Int      @id @default(autoincrement())
+  chainId      String
+  address      String
+  symbol       String
+  name         String?
+  decimals     Int
+  logoUrl      String?
+  coingeckoId  String?
+  verified     Boolean  @default(false)
+  sources      String[]
+  priceUsd     Decimal? @db.Decimal(20, 8)
+  marketCapUsd Decimal? @db.Decimal(20, 2)
+  volume24hUsd Decimal? @db.Decimal(20, 2)
+  liquidityUsd Decimal? @db.Decimal(20, 2)
+  metadata     Json     @default("{}")
+  lastUpdated  DateTime @default(now())
+  createdAt    DateTime @default(now())
+
+  @@unique([chainId, address])
+  @@index([symbol])
+  @@index([chainId])
+}
+
+model Swap {
+  id               String         @id @default(uuid())
+  tenantId         String?
+  userId           String?
+  userAddress      String
+  inputChainId     String
+  inputToken       String
+  inputAmount      String
+  outputChainId    String
+  outputToken      String
+  expectedOutput   String
+  minimumOutput    String
+  actualOutput     String?
+  routeData        Json
+  status           String         @default("PENDING")
+  currentStepIndex Int            @default(0)
+  platformFee      String?
+  tenantFee        String?
+  gasCost          String?
+  createdAt        DateTime       @default(now())
+  startedAt        DateTime?
+  completedAt      DateTime?
+  error            String?
+  refundTxHash     String?
+  dcaExecutions    DCAExecution[]
+  tenant           Tenant?        @relation(fields: [tenantId], references: [id])
+  user             User?          @relation(fields: [userId], references: [id])
+  steps            SwapStep[]
+
+  @@index([userAddress])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model SwapStep {
+  id             Int       @id @default(autoincrement())
+  swapId         String
+  stepIndex      Int
+  type           String
+  chainId        String
+  protocol       String
+  inputToken     String
+  outputToken    String
+  inputAmount    String
+  expectedOutput String
+  actualOutput   String?
+  status         String    @default("PENDING")
+  txHash         String?
+  blockNumber    Int?
+  error          String?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  swap           Swap      @relation(fields: [swapId], references: [id], onDelete: Cascade)
+
+  @@index([swapId])
+}
+
+model User {
+  id             String         @id @default(cuid())
+  primaryAddress String?
+  email          String?        @unique
+  username       String?        @unique
+  avatar         String?
+  preferences    Json?
+  emailVerified  Boolean        @default(false)
+  pushToken      String?
+  telegramId     String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  dcaStrategies  DCAStrategy[]
+  limitOrders    LimitOrder[]
+  notifications  Notification[]
+  portfolio      Portfolio?
+  priceAlerts    PriceAlert[]
+  sessions       Session[]
+  swaps          Swap[]
+  addresses      UserAddress[]
+
+  @@index([primaryAddress])
+}
+
+model UserAddress {
+  id        String   @id @default(cuid())
+  userId    String
+  chainType String
+  address   String
+  isPrimary Boolean  @default(false)
+  label     String?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([chainType, address])
+  @@index([userId])
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  userAgent String?
+  ipAddress String?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  type      String
+  title     String
+  message   String
+  data      Json?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+}
+
+model LimitOrder {
+  id               String      @id @default(cuid())
+  userId           String
+  tenantId         String?
+  type             OrderType
+  status           OrderStatus @default(PENDING)
+  fromChainId      String
+  toChainId        String
+  fromTokenAddress String
+  toTokenAddress   String
+  fromTokenSymbol  String
+  toTokenSymbol    String
+  inputAmount      String
+  targetPrice      String
+  minOutputAmount  String
+  slippage         Float       @default(0.5)
+  expiresAt        DateTime?
+  executedAt       DateTime?
+  executedTxHash   String?
+  executedPrice    String?
+  outputAmount     String?
+  platformFeeUsd   Float?
+  gasCostUsd       Float?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  cancelledAt      DateTime?
+  cancelReason     String?
+  tenant           Tenant?     @relation(fields: [tenantId], references: [id])
+  user             User        @relation(fields: [userId], references: [id])
+
+  @@index([userId, status])
+  @@index([status, expiresAt])
+  @@index([fromTokenAddress, toTokenAddress, status])
+}
+
+model DCAStrategy {
+  id                  String         @id @default(cuid())
+  userId              String
+  tenantId            String?
+  name                String?
+  status              DCAStatus      @default(ACTIVE)
+  fromChainId         String
+  toChainId           String
+  fromTokenAddress    String
+  toTokenAddress      String
+  fromTokenSymbol     String
+  toTokenSymbol       String
+  amountPerExecution  String
+  frequency           DCAFrequency
+  customIntervalHours Int?
+  totalExecutions     Int?
+  executedCount       Int            @default(0)
+  startAt             DateTime       @default(now())
+  endAt               DateTime?
+  nextExecutionAt     DateTime
+  lastExecutionAt     DateTime?
+  slippage            Float          @default(1.0)
+  maxPriceImpact      Float          @default(3.0)
+  skipOnHighGas       Boolean        @default(false)
+  maxGasUsd           Float?
+  totalInputAmount    String         @default("0")
+  totalOutputAmount   String         @default("0")
+  totalFeesPaid       Float          @default(0)
+  averagePrice        String?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  pausedAt            DateTime?
+  cancelledAt         DateTime?
+  executions          DCAExecution[]
+  tenant              Tenant?        @relation(fields: [tenantId], references: [id])
+  user                User           @relation(fields: [userId], references: [id])
+
+  @@index([userId, status])
+  @@index([status, nextExecutionAt])
+}
+
+model DCAExecution {
+  id              String             @id @default(cuid())
+  strategyId      String
+  executionNumber Int
+  status          DCAExecutionStatus @default(PENDING)
+  inputAmount     String
+  outputAmount    String?
+  price           String?
+  swapId          String?
+  txHash          String?
+  platformFeeUsd  Float?
+  gasCostUsd      Float?
+  scheduledAt     DateTime
+  executedAt      DateTime?
+  failureReason   String?
+  retryCount      Int                @default(0)
+  createdAt       DateTime           @default(now())
+  strategy        DCAStrategy        @relation(fields: [strategyId], references: [id])
+  swap            Swap?              @relation(fields: [swapId], references: [id])
+
+  @@index([strategyId, status])
+  @@index([scheduledAt, status])
+}
+
+model Portfolio {
+  id              String              @id @default(cuid())
+  userId          String              @unique
+  totalValueUsd   Float               @default(0)
+  totalPnlUsd     Float               @default(0)
+  totalPnlPercent Float               @default(0)
+  lastUpdatedAt   DateTime            @default(now())
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  user            User                @relation(fields: [userId], references: [id])
+  holdings        PortfolioHolding[]
+  snapshots       PortfolioSnapshot[]
+}
+
+model PortfolioHolding {
+  id                   String    @id @default(cuid())
+  portfolioId          String
+  chainId              String
+  tokenAddress         String
+  tokenSymbol          String
+  tokenName            String
+  balance              String
+  balanceUsd           Float     @default(0)
+  avgCostBasis         Float     @default(0)
+  totalCost            Float     @default(0)
+  unrealizedPnl        Float     @default(0)
+  unrealizedPnlPercent Float     @default(0)
+  realizedPnl          Float     @default(0)
+  lastUpdatedAt        DateTime  @default(now())
+  isHidden             Boolean   @default(false)
+  isTracked            Boolean   @default(true)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  portfolio            Portfolio @relation(fields: [portfolioId], references: [id])
+
+  @@unique([portfolioId, chainId, tokenAddress])
+  @@index([portfolioId])
+}
+
+model PortfolioSnapshot {
+  id            String    @id @default(cuid())
+  portfolioId   String
+  totalValueUsd Float
+  totalPnlUsd   Float
+  holdings      Json
+  timestamp     DateTime  @default(now())
+  portfolio     Portfolio @relation(fields: [portfolioId], references: [id])
+
+  @@index([portfolioId, timestamp])
+}
+
+model PriceAlert {
+  id              String      @id @default(cuid())
+  userId          String
+  chainId         String
+  tokenAddress    String
+  tokenSymbol     String
+  type            AlertType
+  targetPrice     Float
+  currentPrice    Float?
+  status          AlertStatus @default(ACTIVE)
+  triggeredAt     DateTime?
+  notifyEmail     Boolean     @default(true)
+  notifyPush      Boolean     @default(true)
+  notifyTelegram  Boolean     @default(false)
+  telegramChatId  String?
+  isRecurring     Boolean     @default(false)
+  cooldownMinutes Int         @default(60)
+  lastNotifiedAt  DateTime?
+  note            String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  user            User        @relation(fields: [userId], references: [id])
+
+  @@index([userId, status])
+  @@index([status, tokenAddress])
+}
+
+model AdSlot {
+  id          String   @id
+  name        String
+  description String?
+  position    String
+  dimensions  String
+  width       Int      // ADD THIS
+  height      Int      // ADD THIS
+  basePrice   Float
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  bookings    AdBooking[]
+}
+
+model AdBooking {
+  id                 String          @id @default(cuid())
+  slotId             String
+  userId             String?
+  email              String
+  companyName        String?
+  contactName        String?
+  startDate          DateTime        @db.Date
+  endDate            DateTime        @db.Date
+  days               Int
+  imageUrl           String
+  targetUrl          String
+  altText            String?
+  basePricePerDay    Float
+  volumeDiscountPct  Float           @default(0)
+  advanceDiscountPct Float           @default(0)
+  totalDiscountPct   Float           @default(0)
+  subtotal           Float
+  discountAmount     Float           @default(0)
+  finalPrice         Float
+  requiresApproval   Boolean         @default(true)
+  status             AdBookingStatus @default(PENDING_PAYMENT)
+  approvedAt         DateTime?
+  approvedBy         String?
+  rejectedAt         DateTime?
+  rejectedReason     String?
+  paymentStatus      PaymentStatus   @default(UNPAID)
+  paymentMethod      String?
+  paymentTxHash      String?
+  paymentChainId     String?
+  paidAt             DateTime?
+  impressions        Int             @default(0)
+  clicks             Int             @default(0)
+  adminNotes         String?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  slot               AdSlot          @relation(fields: [slotId], references: [id])
+
+  @@index([status])
+  @@index([slotId, startDate, endDate])
+  @@index([email])
+}
+
+model TokenListingRequest {
+  id              String               @id @default(cuid())
+  userId          String?
+  email           String
+  telegramHandle  String?
+  projectRole     String?
+  chainId         Int
+  contractAddress String
+  symbol          String
+  name            String
+  decimals        Int                  @default(18)
+  totalSupply     String?
+  logoUrl         String?
+  description     String?
+  websiteUrl      String?
+  whitepaperUrl   String?
+  twitterUrl      String?
+  telegramUrl     String?
+  discordUrl      String?
+  githubUrl       String?
+  coingeckoId     String?
+  coinmarketcapId String?
+  launchDate      DateTime?
+  isAudited       Boolean              @default(false)
+  auditUrl        String?
+  additionalNotes String?
+  listingFee      Float                @default(300)
+  status          ListingRequestStatus @default(PENDING_PAYMENT)
+  reviewedAt      DateTime?
+  reviewedBy      String?
+  rejectedReason  String?
+  paymentStatus   PaymentStatus        @default(UNPAID)
+  paymentMethod   String?
+  paymentTxHash   String?
+  paymentChainId  String?
+  paidAt          DateTime?
+  adminNotes      String?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  @@unique([chainId, contractAddress])
+  @@index([status])
+  @@index([email])
+}
+
+model PlatformSettings {
+  id                           String   @id @default("default")
+  adBasePricePerDay            Float    @default(100)
+  adRequiresApproval           Boolean  @default(true)
+  adVolumeDiscounts            Json     @default("[]")
+  adAdvanceDiscountPerDay      Float    @default(1)
+  adAdvanceDiscountPerWeek     Float    @default(2)
+  adMaxAdvanceDiscountPct      Float    @default(30)
+  tokenListingFee              Float    @default(300)
+  tokenListingRequiresApproval Boolean  @default(true)
+  acceptedPaymentChains        Json     @default("[]")
+  paymentWalletAddress         String?
+  updatedAt                    DateTime @updatedAt
+}
+
+enum OrderType {
+  BUY
+  SELL
+}
+
+enum OrderStatus {
+  PENDING
+  PARTIALLY_FILLED
+  FILLED
+  CANCELLED
+  EXPIRED
+  FAILED
+}
+
+enum DCAStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+enum DCAFrequency {
+  HOURLY
+  DAILY
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+  CUSTOM
+}
+
+enum DCAExecutionStatus {
+  PENDING
+  EXECUTING
+  COMPLETED
+  FAILED
+  SKIPPED
+}
+
+enum AlertType {
+  PRICE_ABOVE
+  PRICE_BELOW
+  PRICE_CHANGE_PERCENT
+}
+
+enum AlertStatus {
+  ACTIVE
+  TRIGGERED
+  DISABLED
+}
+
+enum AdBookingStatus {
+  PENDING_PAYMENT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  UNPAID
+  PENDING
+  PAID
+  REFUNDED
+  FAILED
+}
+
+enum ListingRequestStatus {
+  PENDING_PAYMENT
+  PENDING_REVIEW
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  LISTED
+  CANCELLED
+  REFUNDED
+}
+
+model Chain {
+  id                     String   @id @default(cuid())
+  chainId                String   @unique
+  name                   String
+  symbol                 String
+  color                  String
+  type                   String   // evm, solana, sui, tron
+  trustwalletId          String?
+  dexscreenerId          String?
+  defillamaId            String?
+  coingeckoAssetPlatform String?
+  wrappedNativeAddress   String?
+  rpcEnvKey              String
+  rpcDefault             String
+  explorerUrl            String
+  explorerName           String
+  popularity             Int      @default(0)
+  isActive               Boolean  @default(true)
+  isTestnet              Boolean  @default(false)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([popularity])
+}
+
+model ConfigVersion {
+  id              String   @id @default("main")
+  version         String
+  chainsVersion   String?
+  tokensVersion   String?
+  chainsUpdatedAt DateTime?
+  tokensUpdatedAt DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}

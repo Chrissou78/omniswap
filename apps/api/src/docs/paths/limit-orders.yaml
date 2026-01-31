@@ -1,0 +1,250 @@
+paths:
+  /api/v1/limit-orders:
+    get:
+      tags:
+        - Limit Orders
+      summary: Get all limit orders
+      description: |
+        Retrieve limit orders for the authenticated user.
+        
+        **Filtering:**
+        - Filter by status using comma-separated values
+        - Filter by order type (BUY/SELL)
+        - Filter by chain or token address
+      operationId: getLimitOrders
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+          description: Comma-separated statuses (PENDING,FILLED,CANCELLED,etc.)
+          example: "PENDING,PARTIALLY_FILLED"
+        - name: orderType
+          in: query
+          schema:
+            type: string
+            enum: [BUY, SELL]
+        - name: chainId
+          in: query
+          schema:
+            type: integer
+          example: 1
+        - name: tokenAddress
+          in: query
+          schema:
+            type: string
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/OffsetParam'
+      responses:
+        '200':
+          description: List of limit orders
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      orders:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/LimitOrder'
+    
+    post:
+      tags:
+        - Limit Orders
+      summary: Create a limit order
+      description: |
+        Create a new limit order to execute at a target price.
+        
+        **Buy Order:**
+        Set `orderType: "buy"` to purchase output token when price drops to target.
+        Target price must be BELOW current market price.
+        
+        **Sell Order:**
+        Set `orderType: "sell"` to sell input token when price rises to target.
+        Target price must be ABOVE current market price.
+        
+        **Fees:**
+        Platform fee is 0.4% (40 bps) of the input amount.
+        
+        **Expiration:**
+        Orders can optionally expire after a set time (max 30 days).
+      operationId: createLimitOrder
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateLimitOrderRequest'
+            examples:
+              buyOrder:
+                summary: Buy ETH when price drops
+                value:
+                  orderType: "buy"
+                  inputTokenAddress: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+                  inputTokenSymbol: "USDC"
+                  inputTokenDecimals: 6
+                  inputChainId: 1
+                  inputAmount: "1000"
+                  outputTokenAddress: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+                  outputTokenSymbol: "WETH"
+                  outputTokenDecimals: 18
+                  outputChainId: 1
+                  targetPrice: "2000"
+                  slippageBps: 50
+                  expiresIn: 604800000
+              sellOrder:
+                summary: Sell ETH when price rises
+                value:
+                  orderType: "sell"
+                  inputTokenAddress: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+                  inputTokenSymbol: "WETH"
+                  inputTokenDecimals: 18
+                  inputChainId: 1
+                  inputAmount: "1"
+                  outputTokenAddress: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+                  outputTokenSymbol: "USDC"
+                  outputTokenDecimals: 6
+                  outputChainId: 1
+                  targetPrice: "2500"
+                  slippageBps: 50
+      responses:
+        '201':
+          description: Order created successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - $ref: '#/components/schemas/LimitOrder'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalidTargetBuy:
+                  summary: Buy target above current
+                  value:
+                    success: false
+                    message: "Buy order target price must be below current market price"
+                invalidTargetSell:
+                  summary: Sell target below current
+                  value:
+                    success: false
+                    message: "Sell order target price must be above current market price"
+
+  /api/v1/limit-orders/stats:
+    get:
+      tags:
+        - Limit Orders
+      summary: Get order statistics
+      operationId: getLimitOrderStats
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Order statistics
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - $ref: '#/components/schemas/LimitOrderStats'
+
+  /api/v1/limit-orders/{orderId}:
+    get:
+      tags:
+        - Limit Orders
+      summary: Get a specific order
+      operationId: getLimitOrder
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Order details
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - $ref: '#/components/schemas/LimitOrder'
+        '404':
+          description: Order not found
+    
+    patch:
+      tags:
+        - Limit Orders
+      summary: Update an order
+      description: Update a pending limit order. Only pending orders can be modified.
+      operationId: updateLimitOrder
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateLimitOrderRequest'
+      responses:
+        '200':
+          description: Order updated
+        '400':
+          description: Validation error
+        '404':
+          description: Order not found or cannot be modified
+    
+    delete:
+      tags:
+        - Limit Orders
+      summary: Cancel an order
+      description: Cancel a pending or partially filled order
+      operationId: cancelLimitOrder
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Order cancelled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Order cancelled successfully"
+        '404':
+          description: Order not found or cannot be cancelled

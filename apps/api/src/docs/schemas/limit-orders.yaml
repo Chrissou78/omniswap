@@ -1,0 +1,279 @@
+components:
+  schemas:
+    # ==========================================================================
+    # Limit Order Schemas
+    # ==========================================================================
+    
+    LimitOrder:
+      type: object
+      required:
+        - id
+        - userId
+        - orderType
+        - status
+        - inputToken
+        - outputToken
+      properties:
+        id:
+          type: string
+          example: "clq1234567890abcdef"
+        userId:
+          type: string
+          example: "user_abc123"
+        tenantId:
+          type: string
+          nullable: true
+        orderType:
+          type: string
+          enum: [buy, sell]
+          description: |
+            - `buy`: Buy output token when price drops to target
+            - `sell`: Sell input token when price rises to target
+          example: "buy"
+        status:
+          type: string
+          enum: [pending, partially_filled, filled, cancelled, expired, failed]
+          example: "pending"
+        inputToken:
+          $ref: '#/components/schemas/Token'
+        outputToken:
+          $ref: '#/components/schemas/Token'
+        inputAmount:
+          type: string
+          description: Amount of input token
+          example: "1000"
+        outputAmount:
+          type: string
+          nullable: true
+          description: Estimated/actual output amount
+          example: "0.5"
+        targetPrice:
+          type: string
+          description: Target price (output per input)
+          example: "2000"
+        currentPrice:
+          type: number
+          format: double
+          description: Current market price
+          example: 2100
+        executionPrice:
+          type: string
+          nullable: true
+          description: Actual execution price (when filled)
+          example: "2005"
+        priceAtCreation:
+          type: string
+          description: Price when order was created
+          example: "2100"
+        distancePercent:
+          type: number
+          format: double
+          description: Percent distance from target price
+          example: -4.76
+        slippageBps:
+          type: integer
+          description: Max slippage in basis points
+          example: 50
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2024-01-20T00:00:00Z"
+        partialFillAllowed:
+          type: boolean
+          example: false
+        filledAmount:
+          type: string
+          description: Amount filled so far
+          example: "0"
+        fillPercent:
+          type: string
+          description: Percentage filled
+          example: "0"
+        platformFeeBps:
+          type: integer
+          description: Platform fee in basis points
+          example: 40
+        platformFeeAmount:
+          type: string
+          nullable: true
+          example: "4"
+        gasFeeEstimate:
+          type: string
+          nullable: true
+        gasFeeActual:
+          type: string
+          nullable: true
+        txHash:
+          type: string
+          nullable: true
+          example: "0x1234..."
+        blockNumber:
+          type: string
+          nullable: true
+        errorMessage:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        executedAt:
+          type: string
+          format: date-time
+          nullable: true
+        cancelledAt:
+          type: string
+          format: date-time
+          nullable: true
+        fills:
+          type: array
+          items:
+            $ref: '#/components/schemas/LimitOrderFill'
+    
+    LimitOrderFill:
+      type: object
+      properties:
+        id:
+          type: string
+        fillAmount:
+          type: string
+          example: "500"
+        fillPrice:
+          type: string
+          example: "2000"
+        outputAmount:
+          type: string
+          example: "0.25"
+        txHash:
+          type: string
+        blockNumber:
+          type: string
+        gasUsed:
+          type: string
+          nullable: true
+        filledAt:
+          type: string
+          format: date-time
+    
+    LimitOrderStats:
+      type: object
+      properties:
+        totalOrders:
+          type: integer
+          example: 25
+        pendingOrders:
+          type: integer
+          example: 5
+        filledOrders:
+          type: integer
+          example: 15
+        cancelledOrders:
+          type: integer
+          example: 5
+        totalVolume:
+          type: number
+          format: double
+          description: Total volume in USD
+          example: 50000
+        totalFees:
+          type: number
+          format: double
+          description: Total fees paid
+          example: 200
+    
+    # ==========================================================================
+    # Request Schemas
+    # ==========================================================================
+    
+    CreateLimitOrderRequest:
+      type: object
+      required:
+        - orderType
+        - inputTokenAddress
+        - inputTokenSymbol
+        - inputTokenDecimals
+        - inputChainId
+        - inputAmount
+        - outputTokenAddress
+        - outputTokenSymbol
+        - outputTokenDecimals
+        - outputChainId
+        - targetPrice
+      properties:
+        orderType:
+          type: string
+          enum: [buy, sell]
+          example: "buy"
+        inputTokenAddress:
+          type: string
+          example: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+        inputTokenSymbol:
+          type: string
+          example: "USDC"
+        inputTokenDecimals:
+          type: integer
+          example: 6
+        inputTokenLogoURI:
+          type: string
+          format: uri
+        inputChainId:
+          type: integer
+          example: 1
+        inputAmount:
+          type: string
+          pattern: '^\d+\.?\d*$'
+          example: "1000"
+        outputTokenAddress:
+          type: string
+          example: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+        outputTokenSymbol:
+          type: string
+          example: "WETH"
+        outputTokenDecimals:
+          type: integer
+          example: 18
+        outputTokenLogoURI:
+          type: string
+          format: uri
+        outputChainId:
+          type: integer
+          example: 1
+        targetPrice:
+          type: string
+          pattern: '^\d+\.?\d*$'
+          description: Target price (output per input)
+          example: "2000"
+        slippageBps:
+          type: integer
+          minimum: 1
+          maximum: 5000
+          default: 50
+          description: Max slippage (1-5000 bps = 0.01%-50%)
+        expiresIn:
+          type: integer
+          minimum: 60000
+          maximum: 2592000000
+          description: Expiration in milliseconds (1 min - 30 days)
+          example: 86400000
+        partialFillAllowed:
+          type: boolean
+          default: false
+    
+    UpdateLimitOrderRequest:
+      type: object
+      properties:
+        targetPrice:
+          type: string
+          pattern: '^\d+\.?\d*$'
+        slippageBps:
+          type: integer
+          minimum: 1
+          maximum: 5000
+        expiresAt:
+          type: string
+          format: date-time
+        partialFillAllowed:
+          type: boolean

@@ -1,0 +1,269 @@
+paths:
+  /api/v1/alerts:
+    get:
+      tags:
+        - Price Alerts
+      summary: Get all price alerts
+      description: Retrieve all price alerts for the authenticated user
+      operationId: getAlerts
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: List of price alerts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  alerts:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PriceAlert'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    
+    post:
+      tags:
+        - Price Alerts
+      summary: Create a price alert
+      description: |
+        Create a new price alert for a token. 
+        
+        **Alert Types:**
+        - `above`: Triggers when price rises above target
+        - `below`: Triggers when price falls below target  
+        - `percent_change`: Triggers on 24h price change
+        
+        **Notification Methods:**
+        At least one notification method must be enabled.
+        If Telegram is enabled, `telegramChatId` is required.
+        
+        **Recurring Alerts:**
+        Set `isRecurring: true` to receive repeated notifications.
+        Use `cooldownMinutes` to prevent notification spam.
+      operationId: createAlert
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAlertRequest'
+            examples:
+              priceAbove:
+                summary: Price above alert
+                value:
+                  tokenAddress: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+                  tokenSymbol: "USDC"
+                  tokenName: "USD Coin"
+                  chainId: 1
+                  alertType: "above"
+                  targetPrice: 1.05
+                  notifyEmail: true
+                  notifyPush: true
+                  notifyTelegram: false
+                  isRecurring: false
+              priceBelow:
+                summary: Price below alert
+                value:
+                  tokenAddress: "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599"
+                  tokenSymbol: "WBTC"
+                  tokenName: "Wrapped Bitcoin"
+                  chainId: 1
+                  alertType: "below"
+                  targetPrice: 40000
+                  notifyEmail: true
+                  notifyPush: true
+                  isRecurring: true
+                  cooldownMinutes: 60
+                  note: "Buy signal"
+              percentChange:
+                summary: Percent change alert
+                value:
+                  tokenAddress: "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984"
+                  tokenSymbol: "UNI"
+                  tokenName: "Uniswap"
+                  chainId: 1
+                  alertType: "percent_change"
+                  targetPercentChange: 10
+                  notifyEmail: true
+                  notifyPush: true
+      responses:
+        '201':
+          description: Alert created successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - $ref: '#/components/schemas/PriceAlert'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                missingTarget:
+                  summary: Missing target price
+                  value:
+                    success: false
+                    message: "targetPrice required for above/below alerts"
+                duplicateAlert:
+                  summary: Duplicate alert
+                  value:
+                    success: false
+                    message: "A similar alert already exists"
+        '401':
+          description: Unauthorized
+
+  /api/v1/alerts/stats:
+    get:
+      tags:
+        - Price Alerts
+      summary: Get alert statistics
+      description: Get aggregated statistics for user's price alerts
+      operationId: getAlertStats
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Alert statistics
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - $ref: '#/components/schemas/AlertStats'
+
+  /api/v1/alerts/history:
+    get:
+      tags:
+        - Price Alerts
+      summary: Get alert trigger history
+      description: Get history of triggered alerts
+      operationId: getAlertHistory
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/OffsetParam'
+      responses:
+        '200':
+          description: Alert history
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      history:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/AlertHistory'
+
+  /api/v1/alerts/{alertId}:
+    get:
+      tags:
+        - Price Alerts
+      summary: Get a specific alert
+      operationId: getAlert
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: alertId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Alert ID
+      responses:
+        '200':
+          description: Alert details
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - $ref: '#/components/schemas/PriceAlert'
+        '404':
+          description: Alert not found
+    
+    patch:
+      tags:
+        - Price Alerts
+      summary: Update an alert
+      description: Update an existing price alert
+      operationId: updateAlert
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: alertId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAlertRequest'
+      responses:
+        '200':
+          description: Alert updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - $ref: '#/components/schemas/PriceAlert'
+        '404':
+          description: Alert not found
+    
+    delete:
+      tags:
+        - Price Alerts
+      summary: Delete an alert
+      operationId: deleteAlert
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: alertId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Alert deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Alert deleted successfully"
+        '404':
+          description: Alert not found

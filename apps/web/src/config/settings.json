@@ -1,0 +1,23 @@
+{
+  "ads": {
+    "basePricePerDay": 100,
+    "requiresApproval": true,
+    "volumeDiscounts": [
+      { "minDays": 7, "discountPct": 5 },
+      { "minDays": 14, "discountPct": 10 },
+      { "minDays": 30, "discountPct": 20 },
+      { "minDays": 60, "discountPct": 30 }
+    ],
+    "advanceDiscountPerDay": 1,
+    "advanceDiscountPerWeek": 2,
+    "maxAdvanceDiscountPct": 30
+  },
+  "tokenListing": {
+    "fee": 300,
+    "requiresApproval": true
+  },
+  "payment": {
+    "acceptedTokens": ["USDC", "USDT", "ETH"],
+    "walletAddress": ""
+  }
+}

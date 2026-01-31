@@ -1,0 +1,282 @@
+components:
+  schemas:
+    # ==========================================================================
+    # Alert Schemas
+    # ==========================================================================
+    
+    PriceAlert:
+      type: object
+      required:
+        - id
+        - userId
+        - tokenAddress
+        - tokenSymbol
+        - chainId
+        - alertType
+        - isEnabled
+      properties:
+        id:
+          type: string
+          description: Unique alert identifier
+          example: "clq1234567890abcdef"
+        userId:
+          type: string
+          example: "user_abc123"
+        tokenAddress:
+          type: string
+          example: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+        tokenSymbol:
+          type: string
+          example: "USDC"
+        tokenName:
+          type: string
+          example: "USD Coin"
+        tokenLogoURI:
+          type: string
+          format: uri
+          example: "https://assets.coingecko.com/coins/images/6319/thumb/USD_Coin_icon.png"
+        chainId:
+          type: integer
+          example: 1
+        alertType:
+          type: string
+          enum: [above, below, percent_change]
+          description: |
+            - `above`: Trigger when price rises above target
+            - `below`: Trigger when price falls below target
+            - `percent_change`: Trigger on 24h percent change
+          example: "above"
+        targetPrice:
+          type: number
+          format: double
+          nullable: true
+          description: Target price in USD (for above/below alerts)
+          example: 1.05
+        targetPercentChange:
+          type: number
+          format: double
+          nullable: true
+          description: Target percent change (for percent_change alerts)
+          example: 10.0
+        currentPrice:
+          type: number
+          format: double
+          description: Current token price
+          example: 1.0
+        priceAtCreation:
+          type: number
+          format: double
+          description: Price when alert was created
+          example: 0.98
+        isEnabled:
+          type: boolean
+          example: true
+        isRecurring:
+          type: boolean
+          description: Whether alert triggers repeatedly
+          example: false
+        cooldownMinutes:
+          type: integer
+          description: Minimum minutes between triggers for recurring alerts
+          example: 60
+        lastTriggeredAt:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2024-01-15T10:30:00Z"
+        triggerCount:
+          type: integer
+          description: Number of times alert has triggered
+          example: 3
+        notifyEmail:
+          type: boolean
+          example: true
+        notifyPush:
+          type: boolean
+          example: true
+        notifyTelegram:
+          type: boolean
+          example: false
+        telegramChatId:
+          type: string
+          nullable: true
+          example: "123456789"
+        note:
+          type: string
+          nullable: true
+          description: User note/reminder
+          example: "Buy more when it drops"
+        createdAt:
+          type: string
+          format: date-time
+          example: "2024-01-10T08:00:00Z"
+        updatedAt:
+          type: string
+          format: date-time
+          example: "2024-01-15T10:30:00Z"
+    
+    AlertStats:
+      type: object
+      properties:
+        totalAlerts:
+          type: integer
+          description: Total alerts created
+          example: 15
+        activeAlerts:
+          type: integer
+          description: Currently enabled alerts
+          example: 8
+        triggeredToday:
+          type: integer
+          description: Alerts triggered today
+          example: 2
+        triggeredTotal:
+          type: integer
+          description: Total trigger count across all alerts
+          example: 45
+    
+    AlertHistory:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "hist_abc123"
+        alertId:
+          type: string
+          example: "clq1234567890abcdef"
+        tokenSymbol:
+          type: string
+          example: "USDC"
+        tokenLogoURI:
+          type: string
+          format: uri
+        chainId:
+          type: integer
+          example: 1
+        alertType:
+          type: string
+          enum: [above, below, percent_change]
+        targetPrice:
+          type: number
+          format: double
+          nullable: true
+        targetPercentChange:
+          type: number
+          format: double
+          nullable: true
+        triggeredPrice:
+          type: number
+          format: double
+          description: Price when alert triggered
+          example: 1.06
+        notificationsSent:
+          type: array
+          items:
+            type: string
+            enum: [email, push, telegram]
+          example: ["email", "push"]
+        triggeredAt:
+          type: string
+          format: date-time
+          example: "2024-01-15T10:30:00Z"
+    
+    # ==========================================================================
+    # Request Schemas
+    # ==========================================================================
+    
+    CreateAlertRequest:
+      type: object
+      required:
+        - tokenAddress
+        - tokenSymbol
+        - tokenName
+        - chainId
+        - alertType
+      properties:
+        tokenAddress:
+          type: string
+          example: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+        tokenSymbol:
+          type: string
+          maxLength: 20
+          example: "USDC"
+        tokenName:
+          type: string
+          maxLength: 100
+          example: "USD Coin"
+        tokenLogoURI:
+          type: string
+          format: uri
+        chainId:
+          type: integer
+          example: 1
+        alertType:
+          type: string
+          enum: [above, below, percent_change]
+          example: "above"
+        targetPrice:
+          type: number
+          format: double
+          description: Required for above/below alerts
+          example: 1.05
+        targetPercentChange:
+          type: number
+          format: double
+          description: Required for percent_change alerts
+          example: 10.0
+        isRecurring:
+          type: boolean
+          default: false
+        cooldownMinutes:
+          type: integer
+          minimum: 0
+          maximum: 1440
+          default: 0
+          description: Cooldown between triggers (0-1440 minutes)
+        notifyEmail:
+          type: boolean
+          default: true
+        notifyPush:
+          type: boolean
+          default: true
+        notifyTelegram:
+          type: boolean
+          default: false
+        telegramChatId:
+          type: string
+          description: Required if notifyTelegram is true
+        note:
+          type: string
+          maxLength: 500
+    
+    UpdateAlertRequest:
+      type: object
+      properties:
+        alertType:
+          type: string
+          enum: [above, below, percent_change]
+        targetPrice:
+          type: number
+          format: double
+        targetPercentChange:
+          type: number
+          format: double
+        isEnabled:
+          type: boolean
+        isRecurring:
+          type: boolean
+        cooldownMinutes:
+          type: integer
+          minimum: 0
+          maximum: 1440
+        notifyEmail:
+          type: boolean
+        notifyPush:
+          type: boolean
+        notifyTelegram:
+          type: boolean
+        telegramChatId:
+          type: string
+        note:
+          type: string
+          maxLength: 500

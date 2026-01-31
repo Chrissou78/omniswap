@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "updatedAt": 1737410400000,
+  "chains": {
+    "1": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/info/logo.png",
+    "137": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/polygon/info/logo.png",
+    "56": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/smartchain/info/logo.png",
+    "42161": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/arbitrum/info/logo.png",
+    "10": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/optimism/info/logo.png",
+    "8453": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/base/info/logo.png",
+    "43114": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/avalanchec/info/logo.png",
+    "250": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/fantom/info/logo.png",
+    "100": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/xdai/info/logo.png",
+    "25": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/cronos/info/logo.png",
+    "42220": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/celo/info/logo.png",
+    "1088": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/metis/info/logo.png",
+    "324": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/zksync/info/logo.png",
+    "59144": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/linea/info/logo.png",
+    "534352": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/scroll/info/logo.png",
+    "1284": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/moonbeam/info/logo.png",
+    "1285": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/moonriver/info/logo.png",
+    "146": "https://coin-logos.simplr.sh/sonic.png",
+    "80094": "https://coin-logos.simplr.sh/bera.png",
+    "999": "https://coin-logos.simplr.sh/hype.png",
+    "480": "https://coin-logos.simplr.sh/wld.png",
+    "solana-mainnet": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/solana/info/logo.png",
+    "sui-mainnet": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/sui/info/logo.png"
+  },
+  "tokens": {
+    "1-native": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/info/logo.png",
+    "1-0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48/logo.png",
+    "1-0xdAC17F958D2ee523a2206206994597C13D831ec7": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xdAC17F958D2ee523a2206206994597C13D831ec7/logo.png",
+    "137-native": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/polygon/info/logo.png",
+    "56-native": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/smartchain/info/logo.png",
+    "solana-mainnet-native": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/solana/info/logo.png",
+    "sui-mainnet-native": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/sui/info/logo.png"
+  }
+}

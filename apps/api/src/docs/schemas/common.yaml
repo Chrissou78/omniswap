@@ -1,0 +1,328 @@
+components:
+  schemas:
+    # ==========================================================================
+    # Common Response Schemas
+    # ==========================================================================
+    
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+    
+    ErrorResponse:
+      type: object
+      required:
+        - success
+        - message
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: "An error occurred"
+        code:
+          type: string
+          example: "VALIDATION_ERROR"
+        details:
+          type: object
+          additionalProperties: true
+    
+    PaginatedResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        total:
+          type: integer
+          example: 100
+        limit:
+          type: integer
+          example: 50
+        offset:
+          type: integer
+          example: 0
+    
+    # ==========================================================================
+    # Token Schemas
+    # ==========================================================================
+    
+    Token:
+      type: object
+      required:
+        - address
+        - symbol
+        - name
+        - decimals
+        - chainId
+      properties:
+        address:
+          type: string
+          description: Token contract address
+          example: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+        symbol:
+          type: string
+          description: Token symbol
+          example: "USDC"
+        name:
+          type: string
+          description: Token name
+          example: "USD Coin"
+        decimals:
+          type: integer
+          minimum: 0
+          maximum: 18
+          example: 6
+        chainId:
+          type: integer
+          description: Chain ID where token exists
+          example: 1
+        logoURI:
+          type: string
+          format: uri
+          description: Token logo URL
+          example: "https://assets.coingecko.com/coins/images/6319/thumb/USD_Coin_icon.png"
+        price:
+          type: number
+          format: double
+          description: Current USD price
+          example: 1.0
+        priceChange24h:
+          type: number
+          format: double
+          description: 24-hour price change percentage
+          example: 0.05
+    
+    TokenInfo:
+      allOf:
+        - $ref: '#/components/schemas/Token'
+        - type: object
+          properties:
+            marketCap:
+              type: number
+              format: double
+              example: 25000000000
+            volume24h:
+              type: number
+              format: double
+              example: 5000000000
+            isVerified:
+              type: boolean
+              example: true
+    
+    # ==========================================================================
+    # Chain Schemas
+    # ==========================================================================
+    
+    Chain:
+      type: object
+      required:
+        - chainId
+        - name
+        - type
+      properties:
+        chainId:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: "Ethereum"
+        type:
+          type: string
+          enum: [evm, solana, sui]
+          example: "evm"
+        icon:
+          type: string
+          format: uri
+          example: "https://omniswap.io/chains/ethereum.svg"
+        nativeCurrency:
+          type: object
+          properties:
+            name:
+              type: string
+              example: "Ether"
+            symbol:
+              type: string
+              example: "ETH"
+            decimals:
+              type: integer
+              example: 18
+        rpcUrl:
+          type: string
+          format: uri
+          example: "https://mainnet.infura.io/v3/..."
+        explorerUrl:
+          type: string
+          format: uri
+          example: "https://etherscan.io"
+    
+    # ==========================================================================
+    # Route Schemas
+    # ==========================================================================
+    
+    SwapRoute:
+      type: object
+      required:
+        - routeId
+        - outputAmount
+        - steps
+      properties:
+        routeId:
+          type: string
+          example: "route_abc123"
+        outputAmount:
+          type: string
+          description: Expected output amount
+          example: "0.5"
+        outputAmountUsd:
+          type: number
+          format: double
+          example: 1050.00
+        priceImpactBps:
+          type: integer
+          description: Price impact in basis points
+          example: 25
+        estimatedGas:
+          type: string
+          description: Estimated gas units
+          example: "250000"
+        estimatedGasUsd:
+          type: number
+          format: double
+          example: 15.50
+        estimatedTimeSeconds:
+          type: integer
+          description: Estimated execution time
+          example: 30
+        steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/RouteStep'
+        tags:
+          type: array
+          items:
+            type: string
+            enum: [BEST_RETURN, FASTEST, CHEAPEST]
+          example: ["BEST_RETURN"]
+    
+    RouteStep:
+      type: object
+      required:
+        - type
+        - protocol
+        - fromToken
+        - toToken
+      properties:
+        type:
+          type: string
+          enum: [swap, bridge]
+          example: "swap"
+        protocol:
+          type: string
+          description: DEX or bridge protocol used
+          example: "Uniswap V3"
+        protocolLogo:
+          type: string
+          format: uri
+          example: "https://omniswap.io/protocols/uniswap.svg"
+        fromToken:
+          $ref: '#/components/schemas/Token'
+        toToken:
+          $ref: '#/components/schemas/Token'
+        fromChainId:
+          type: integer
+          example: 1
+        toChainId:
+          type: integer
+          example: 1
+        fromAmount:
+          type: string
+          example: "1000"
+        toAmount:
+          type: string
+          example: "0.5"
+        estimatedTimeSeconds:
+          type: integer
+          example: 15
+
+    # ==========================================================================
+    # Transaction Schemas
+    # ==========================================================================
+    
+    Transaction:
+      type: object
+      properties:
+        txHash:
+          type: string
+          description: Transaction hash
+          example: "0x1234567890abcdef..."
+        chainId:
+          type: integer
+          example: 1
+        status:
+          type: string
+          enum: [pending, confirmed, failed]
+          example: "confirmed"
+        blockNumber:
+          type: string
+          example: "18500000"
+        gasUsed:
+          type: string
+          example: "185000"
+        gasFeeUsd:
+          type: number
+          format: double
+          example: 12.50
+        timestamp:
+          type: string
+          format: date-time
+          example: "2024-01-15T10:30:00Z"
+        explorerUrl:
+          type: string
+          format: uri
+          example: "https://etherscan.io/tx/0x1234..."
+
+  # ==========================================================================
+  # Common Parameters
+  # ==========================================================================
+  
+  parameters:
+    ChainIdParam:
+      name: chainId
+      in: path
+      required: true
+      schema:
+        type: integer
+      description: Chain ID (1=Ethereum, 56=BSC, 137=Polygon, etc.)
+      example: 1
+    
+    TokenAddressParam:
+      name: address
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Token contract address
+      example: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+    
+    LimitParam:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 50
+      description: Number of items to return
+    
+    OffsetParam:
+      name: offset
+      in: query
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+      description: Number of items to skip

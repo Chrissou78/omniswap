@@ -1,0 +1,153 @@
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+concurrency:
+  group: deploy-${{ github.event.inputs.environment || 'staging' }}
+  cancel-in-progress: false
+
+jobs:
+  # ==========================================================================
+  # Deploy to Staging
+  # ==========================================================================
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    if: |
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging')
+    environment:
+      name: staging
+      url: https://staging.omniswap.io
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.29.0'
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Update kubeconfig
+        run: aws eks update-kubeconfig --name omniswap-staging --region us-east-1
+
+      - name: Deploy to Kubernetes
+        run: |
+          # Set image tags
+          export IMAGE_TAG=${{ github.sha }}
+          
+          # Apply Kubernetes manifests
+          envsubst < k8s/staging/namespace.yaml | kubectl apply -f -
+          envsubst < k8s/staging/secrets.yaml | kubectl apply -f -
+          envsubst < k8s/staging/configmap.yaml | kubectl apply -f -
+          envsubst < k8s/staging/api-deployment.yaml | kubectl apply -f -
+          envsubst < k8s/staging/web-deployment.yaml | kubectl apply -f -
+          envsubst < k8s/staging/worker-deployment.yaml | kubectl apply -f -
+          envsubst < k8s/staging/services.yaml | kubectl apply -f -
+          envsubst < k8s/staging/ingress.yaml | kubectl apply -f -
+          
+          # Wait for rollout
+          kubectl rollout status deployment/omniswap-api -n omniswap-staging --timeout=300s
+          kubectl rollout status deployment/omniswap-web -n omniswap-staging --timeout=300s
+
+      - name: Run smoke tests
+        run: |
+          sleep 30
+          curl -f https://api-staging.omniswap.io/health || exit 1
+          curl -f https://staging.omniswap.io || exit 1
+
+      - name: Notify Slack
+        if: always()
+        uses: slackapi/slack-github-action@v1
+        with:
+          payload: |
+            {
+              "text": "Staging deployment ${{ job.status }}: ${{ github.sha }}"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  # ==========================================================================
+  # Deploy to Production
+  # ==========================================================================
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: deploy-staging
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production'
+    environment:
+      name: production
+      url: https://app.omniswap.io
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.29.0'
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Update kubeconfig
+        run: aws eks update-kubeconfig --name omniswap-production --region us-east-1
+
+      - name: Deploy to Kubernetes
+        run: |
+          export IMAGE_TAG=${{ github.sha }}
+          
+          envsubst < k8s/production/namespace.yaml | kubectl apply -f -
+          envsubst < k8s/production/secrets.yaml | kubectl apply -f -
+          envsubst < k8s/production/configmap.yaml | kubectl apply -f -
+          envsubst < k8s/production/api-deployment.yaml | kubectl apply -f -
+          envsubst < k8s/production/web-deployment.yaml | kubectl apply -f -
+          envsubst < k8s/production/worker-deployment.yaml | kubectl apply -f -
+          envsubst < k8s/production/services.yaml | kubectl apply -f -
+          envsubst < k8s/production/ingress.yaml | kubectl apply -f -
+          envsubst < k8s/production/hpa.yaml | kubectl apply -f -
+          
+          kubectl rollout status deployment/omniswap-api -n omniswap-production --timeout=300s
+          kubectl rollout status deployment/omniswap-web -n omniswap-production --timeout=300s
+
+      - name: Run smoke tests
+        run: |
+          sleep 30
+          curl -f https://api.omniswap.io/health || exit 1
+          curl -f https://app.omniswap.io || exit 1
+
+      - name: Notify Slack
+        if: always()
+        uses: slackapi/slack-github-action@v1
+        with:
+          payload: |
+            {
+              "text": "Production deployment ${{ job.status }}: ${{ github.sha }}"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

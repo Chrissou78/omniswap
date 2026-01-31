@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: omniswap-api
+  namespace: omniswap-production
+  labels:
+    app: omniswap-api
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 3001
+      protocol: TCP
+      name: http
+  selector:
+    app: omniswap-api
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: omniswap-web
+  namespace: omniswap-production
+  labels:
+    app: omniswap-web
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 3000
+      protocol: TCP
+      name: http
+  selector:
+    app: omniswap-web

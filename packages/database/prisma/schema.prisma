@@ -1,0 +1,389 @@
+// packages/database/prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// ENUMS
+// =============================================================================
+
+enum AdminRole {
+  SUPER_ADMIN
+  ADMIN
+  MODERATOR
+}
+
+enum ChainType {
+  EVM
+  SOLANA
+  SUI
+  COSMOS
+  BITCOIN
+}
+
+enum BookingStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  CONFIRMED
+  FAILED
+  REFUNDED
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+  UNKNOWN
+}
+
+// =============================================================================
+// USER & AUTH
+// =============================================================================
+
+model User {
+  id        String   @id @default(cuid())
+  email     String?  @unique
+  address   String   @unique
+  name      String?
+  avatar    String?
+  nonce     String?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  advertiser Advertiser?
+  swaps      SwapTransaction[]
+}
+
+model Admin {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  role         AdminRole @default(ADMIN)
+  name         String?
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+  
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  // Relations
+  auditLogs    AuditLog[]
+  
+  @@index([email])
+  @@index([role])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  adminId   String
+  action    String
+  entity    String
+  entityId  String?
+  details   Json?
+  ipAddress String?
+  userAgent String?
+  
+  createdAt DateTime @default(now())
+
+  // Relations
+  admin     Admin    @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([adminId])
+  @@index([entity, entityId])
+  @@index([createdAt])
+}
+
+// =============================================================================
+// CHAIN & TOKEN MANAGEMENT
+// =============================================================================
+
+model Chain {
+  id             String    @id
+  name           String
+  symbol         String
+  type           ChainType @default(EVM)
+  rpcUrl         String?
+  rpcUrlBackup   String?
+  explorerUrl    String?
+  logoUrl        String?
+  trustwalletId  String?
+  coingeckoId    String?
+  popularity     Int       @default(0)
+  isActive       Boolean   @default(true)
+  isTestnet      Boolean   @default(false)
+  nativeDecimals Int       @default(18)
+  
+  // Gas settings
+  avgGasPrice    Decimal?  @db.Decimal(30, 18)
+  gasMultiplier  Decimal   @default(1.1) @db.Decimal(5, 2)
+  
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // Relations
+  tokens         Token[]
+  swapsFrom      SwapTransaction[] @relation("FromChain")
+  swapsTo        SwapTransaction[] @relation("ToChain")
+
+  @@index([type])
+  @@index([isActive])
+  @@index([popularity])
+}
+
+model Token {
+  id            String    @id @default(cuid())
+  chainId       String
+  address       String
+  symbol        String
+  name          String
+  decimals      Int       @default(18)
+  logoUrl       String?
+  coingeckoId   String?
+  popularity    Int       @default(0)
+  isActive      Boolean   @default(true)
+  isNative      Boolean   @default(false)
+  isStablecoin  Boolean   @default(false)
+  isWrapped     Boolean   @default(false)
+  tags          Json?
+  
+  // Audit info
+  lastAuditAt   DateTime?
+  auditResult   Json?
+  riskLevel     RiskLevel @default(UNKNOWN)
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  chain         Chain     @relation(fields: [chainId], references: [id], onDelete: Cascade)
+
+  @@unique([chainId, address])
+  @@index([symbol])
+  @@index([chainId])
+  @@index([isActive])
+  @@index([popularity])
+}
+
+// =============================================================================
+// SWAP TRANSACTIONS
+// =============================================================================
+
+model SwapTransaction {
+  id              String   @id @default(cuid())
+  userId          String?
+  fromChainId     String
+  toChainId       String
+  fromToken       String
+  toToken         String
+  fromAmount      Decimal  @db.Decimal(78, 18)
+  toAmount        Decimal  @db.Decimal(78, 18)
+  fromAmountUsd   Decimal  @db.Decimal(20, 2)
+  toAmountUsd     Decimal  @db.Decimal(20, 2)
+  route           String   @default("direct")
+  platformFeeUsd  Decimal? @db.Decimal(20, 2)
+  gasFeeUsd       Decimal? @db.Decimal(20, 2)
+  txHash          String?
+  status          String   @default("pending")
+  errorMessage    String?
+  
+  createdAt       DateTime @default(now())
+  completedAt     DateTime?
+
+  // Relations
+  user            User?    @relation(fields: [userId], references: [id])
+  fromChain       Chain    @relation("FromChain", fields: [fromChainId], references: [id])
+  toChain         Chain    @relation("ToChain", fields: [toChainId], references: [id])
+
+  @@index([userId])
+  @@index([fromChainId])
+  @@index([toChainId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([route])
+}
+
+// =============================================================================
+// ADVERTISING SYSTEM
+// =============================================================================
+
+model Advertiser {
+  id            String    @id @default(cuid())
+  userId        String?   @unique
+  walletAddress String    @unique
+  email         String?
+  companyName   String?
+  website       String?
+  isVerified    Boolean   @default(false)
+  isBlocked     Boolean   @default(false)
+  totalSpentUsd Decimal   @default(0) @db.Decimal(20, 2)
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  user          User?     @relation(fields: [userId], references: [id])
+  bookings      AdBooking[]
+  payments      AdPayment[]
+
+  @@index([walletAddress])
+  @@index([isVerified])
+}
+
+model AdSlot {
+  id            String    @id @default(cuid())
+  name          String    @unique
+  position      String
+  width         Int
+  height        Int
+  pricePerDayUsd Decimal  @db.Decimal(10, 2)
+  description   String?
+  isActive      Boolean   @default(true)
+  maxFileSize   Int       @default(500000)
+  allowedFormats String[] @default(["image/png", "image/jpeg", "image/gif", "image/webp"])
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  bookings      AdBooking[]
+
+  @@index([position])
+  @@index([isActive])
+}
+
+model AdBooking {
+  id              String        @id @default(cuid())
+  advertiserId    String
+  slotId          String
+  imageUrl        String
+  targetUrl       String
+  altText         String?
+  startDate       DateTime
+  endDate         DateTime
+  totalDays       Int
+  totalPriceUsd   Decimal       @db.Decimal(20, 2)
+  platformFeeUsd  Decimal       @db.Decimal(20, 2)
+  netAmountUsd    Decimal       @db.Decimal(20, 2)
+  status          BookingStatus @default(PENDING)
+  
+  // Approval
+  approvedAt      DateTime?
+  approvedBy      String?
+  rejectedAt      DateTime?
+  rejectedBy      String?
+  rejectionReason String?
+  
+  // Analytics
+  impressions     Int           @default(0)
+  clicks          Int           @default(0)
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Relations
+  advertiser      Advertiser    @relation(fields: [advertiserId], references: [id], onDelete: Cascade)
+  slot            AdSlot        @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  payments        AdPayment[]
+
+  @@index([advertiserId])
+  @@index([slotId])
+  @@index([status])
+  @@index([startDate, endDate])
+}
+
+model AdPayment {
+  id            String        @id @default(cuid())
+  bookingId     String
+  advertiserId  String
+  amountUsd     Decimal       @db.Decimal(20, 2)
+  amountToken   Decimal       @db.Decimal(78, 18)
+  tokenSymbol   String
+  tokenAddress  String?
+  chainId       String
+  txHash        String        @unique
+  fromAddress   String
+  toAddress     String
+  status        PaymentStatus @default(PENDING)
+  
+  confirmedAt   DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  // Relations
+  booking       AdBooking     @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  advertiser    Advertiser    @relation(fields: [advertiserId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId])
+  @@index([advertiserId])
+  @@index([txHash])
+  @@index([status])
+}
+
+// =============================================================================
+// CONFIGURATION
+// =============================================================================
+
+model AdConfig {
+  id                   String   @id @default("default")
+  platformFeePercent   Int      @default(50)
+  minBookingDays       Int      @default(1)
+  maxBookingDays       Int      @default(365)
+  requireApproval      Boolean  @default(true)
+  autoApproveThreshold Decimal? @db.Decimal(20, 2)
+  supportedTokens      Json     @default("[]")
+  platformWallets      Json     @default("{}")
+  
+  updatedAt            DateTime @updatedAt
+}
+
+model PlatformConfig {
+  id                    String   @id @default("default")
+  platformFeeDirect     Decimal  @default(0.004) @db.Decimal(5, 4)
+  platformFeeDelegated  Decimal  @default(0.01) @db.Decimal(5, 4)
+  platformFeeCex        Decimal  @default(0.01) @db.Decimal(5, 4)
+  delegatedMinUsd       Decimal  @default(10) @db.Decimal(20, 2)
+  delegatedMaxUsd       Decimal  @default(500000) @db.Decimal(20, 2)
+  cexThresholdUsd       Decimal  @default(100) @db.Decimal(20, 2)
+  cexSavingsThreshold   Decimal  @default(3) @db.Decimal(20, 2)
+  cexDirectCostThreshold Decimal @default(10) @db.Decimal(20, 2)
+  treasuryWallets       Json     @default("{}")
+  mexcDepositWallets    Json     @default("{}")
+  
+  updatedAt             DateTime @updatedAt
+}
+
+// =============================================================================
+// PRICE CACHE (optional - for DB-backed caching)
+// =============================================================================
+
+model PriceCache {
+  id        String   @id
+  chainId   String
+  address   String
+  symbol    String
+  priceUsd  Decimal  @db.Decimal(30, 18)
+  source    String
+  
+  updatedAt DateTime @updatedAt
+
+  @@unique([chainId, address])
+  @@index([symbol])
+  @@index([updatedAt])
+}

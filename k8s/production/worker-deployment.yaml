@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: omniswap-worker
+  namespace: omniswap-production
+  labels:
+    app: omniswap-worker
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app: omniswap-worker
+  template:
+    metadata:
+      labels:
+        app: omniswap-worker
+        version: "${IMAGE_TAG}"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+      
+      containers:
+        - name: worker
+          image: ghcr.io/omniswap/omniswap/worker:${IMAGE_TAG}
+          imagePullPolicy: Always
+          
+          envFrom:
+            - configMapRef:
+                name: omniswap-config
+            - secretRef:
+                name: omniswap-secrets
+          
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+          
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - "pgrep -f 'node.*workers' || exit 1"
+            initialDelaySeconds: 30
+            periodSeconds: 30

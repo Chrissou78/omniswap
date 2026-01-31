@@ -1,0 +1,370 @@
+components:
+  schemas:
+    # ==========================================================================
+    # DCA Schemas
+    # ==========================================================================
+    
+    DCAStrategy:
+      type: object
+      required:
+        - id
+        - userId
+        - status
+        - inputToken
+        - outputToken
+      properties:
+        id:
+          type: string
+          example: "clq1234567890abcdef"
+        userId:
+          type: string
+        tenantId:
+          type: string
+          nullable: true
+        name:
+          type: string
+          example: "Monthly ETH DCA"
+        status:
+          type: string
+          enum: [active, paused, completed, cancelled, failed]
+          example: "active"
+        inputToken:
+          $ref: '#/components/schemas/Token'
+        outputToken:
+          $ref: '#/components/schemas/Token'
+        amountPerExecution:
+          type: string
+          description: Amount to swap per execution
+          example: "100"
+        frequency:
+          type: string
+          enum: [hourly, daily, weekly, biweekly, monthly, custom]
+          example: "daily"
+        customIntervalMs:
+          type: string
+          nullable: true
+          description: Custom interval in milliseconds
+          example: "43200000"
+        totalExecutions:
+          type: integer
+          description: Total planned executions
+          example: 30
+        executionsCompleted:
+          type: integer
+          example: 10
+        nextExecutionAt:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2024-01-16T10:00:00Z"
+        progress:
+          type: integer
+          description: Completion percentage
+          example: 33
+        slippageBps:
+          type: integer
+          example: 100
+        maxPriceImpactBps:
+          type: integer
+          example: 300
+        skipOnHighGas:
+          type: boolean
+          example: true
+        maxGasUsd:
+          type: string
+          nullable: true
+          example: "10"
+        stats:
+          type: object
+          properties:
+            totalInputSpent:
+              type: string
+              example: "1000"
+            totalOutputReceived:
+              type: string
+              example: "0.5"
+            averagePrice:
+              type: string
+              nullable: true
+              example: "2000"
+            currentPrice:
+              type: number
+              format: double
+              example: 2100
+            unrealizedPnL:
+              type: number
+              format: double
+              description: Unrealized profit/loss in USD
+              example: 50
+            unrealizedPnLPercent:
+              type: number
+              format: double
+              example: 5
+        fees:
+          type: object
+          properties:
+            platformFeeBps:
+              type: integer
+              example: 40
+            totalPlatformFees:
+              type: string
+              example: "4"
+            totalGasFees:
+              type: string
+              example: "10"
+        consecutiveFailures:
+          type: integer
+          example: 0
+        lastError:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        pausedAt:
+          type: string
+          format: date-time
+          nullable: true
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+        cancelledAt:
+          type: string
+          format: date-time
+          nullable: true
+        recentExecutions:
+          type: array
+          items:
+            $ref: '#/components/schemas/DCAExecution'
+    
+    DCAExecution:
+      type: object
+      properties:
+        id:
+          type: string
+        strategyId:
+          type: string
+        executionNumber:
+          type: integer
+          example: 5
+        status:
+          type: string
+          enum: [pending, executing, completed, failed, skipped]
+          example: "completed"
+        inputAmount:
+          type: string
+          example: "100"
+        outputAmount:
+          type: string
+          nullable: true
+          example: "0.05"
+        executionPrice:
+          type: string
+          nullable: true
+          example: "2000"
+        priceImpactBps:
+          type: integer
+          nullable: true
+          example: 15
+        platformFeeAmount:
+          type: string
+          nullable: true
+          example: "0.4"
+        gasFeeAmount:
+          type: string
+          nullable: true
+          example: "1.5"
+        txHash:
+          type: string
+          nullable: true
+        blockNumber:
+          type: string
+          nullable: true
+        errorMessage:
+          type: string
+          nullable: true
+        scheduledAt:
+          type: string
+          format: date-time
+        startedAt:
+          type: string
+          format: date-time
+          nullable: true
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+    
+    DCAStats:
+      type: object
+      properties:
+        totalStrategies:
+          type: integer
+          example: 5
+        activeStrategies:
+          type: integer
+          example: 3
+        completedStrategies:
+          type: integer
+          example: 2
+        totalInvested:
+          type: number
+          format: double
+          description: Total input amount invested
+          example: 5000
+        totalReceived:
+          type: number
+          format: double
+          description: Total output received
+          example: 2.5
+        totalFees:
+          type: number
+          format: double
+          example: 25
+    
+    DCAAnalytics:
+      type: object
+      properties:
+        executionHistory:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+                format: date
+                example: "2024-01-15"
+              inputAmount:
+                type: number
+                format: double
+                example: 100
+              outputAmount:
+                type: number
+                format: double
+                example: 0.05
+              price:
+                type: number
+                format: double
+                example: 2000
+        averagePrice:
+          type: number
+          format: double
+          description: Average purchase price
+          example: 2050
+        currentPrice:
+          type: number
+          format: double
+          example: 2100
+        performancePercent:
+          type: number
+          format: double
+          description: Performance vs average price
+          example: 2.44
+    
+    # ==========================================================================
+    # Request Schemas
+    # ==========================================================================
+    
+    CreateDCARequest:
+      type: object
+      required:
+        - inputTokenAddress
+        - inputTokenSymbol
+        - inputTokenDecimals
+        - inputChainId
+        - outputTokenAddress
+        - outputTokenSymbol
+        - outputTokenDecimals
+        - outputChainId
+        - amountPerExecution
+        - frequency
+        - totalExecutions
+      properties:
+        name:
+          type: string
+          maxLength: 100
+          example: "Weekly ETH Accumulation"
+        inputTokenAddress:
+          type: string
+        inputTokenSymbol:
+          type: string
+        inputTokenDecimals:
+          type: integer
+        inputTokenLogoURI:
+          type: string
+          format: uri
+        inputChainId:
+          type: integer
+        outputTokenAddress:
+          type: string
+        outputTokenSymbol:
+          type: string
+        outputTokenDecimals:
+          type: integer
+        outputTokenLogoURI:
+          type: string
+          format: uri
+        outputChainId:
+          type: integer
+        amountPerExecution:
+          type: string
+          pattern: '^\d+\.?\d*$'
+          example: "100"
+        frequency:
+          type: string
+          enum: [hourly, daily, weekly, biweekly, monthly, custom]
+          example: "weekly"
+        customIntervalMs:
+          type: integer
+          minimum: 3600000
+          maximum: 2592000000
+          description: Required for custom frequency (1 hour - 30 days in ms)
+        totalExecutions:
+          type: integer
+          minimum: 2
+          maximum: 365
+          example: 52
+        slippageBps:
+          type: integer
+          minimum: 1
+          maximum: 5000
+          default: 100
+        maxPriceImpactBps:
+          type: integer
+          minimum: 1
+          maximum: 5000
+          default: 300
+        skipOnHighGas:
+          type: boolean
+          default: false
+        maxGasUsd:
+          type: number
+          minimum: 0
+          maximum: 1000
+          description: Max gas in USD to execute (if skipOnHighGas is true)
+    
+    UpdateDCARequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 100
+        slippageBps:
+          type: integer
+          minimum: 1
+          maximum: 5000
+        maxPriceImpactBps:
+          type: integer
+          minimum: 1
+          maximum: 5000
+        skipOnHighGas:
+          type: boolean
+        maxGasUsd:
+          type: number
+          minimum: 0
+          maximum: 1000
+          nullable: true

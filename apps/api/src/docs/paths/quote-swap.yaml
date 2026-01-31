@@ -1,0 +1,351 @@
+paths:
+  /api/v1/quote:
+    post:
+      tags:
+        - Quote
+      summary: Get swap quote
+      description: |
+        Get a quote for swapping tokens. Returns multiple routes ranked by best return, fastest, and cheapest.
+        
+        **Supported Chains:**
+        - EVM: Ethereum (1), BSC (56), Polygon (137), Arbitrum (42161), Optimism (10), Base (8453), Avalanche (43114)
+        - Solana (101)
+        - Sui (784)
+        
+        **Cross-chain:**
+        Set different `inputChainId` and `outputChainId` for cross-chain swaps via Li.Fi or Wormhole.
+        
+        **Route Rankings:**
+        - `BEST_RETURN`: Highest output amount
+        - `FASTEST`: Lowest estimated time
+        - `CHEAPEST`: Lowest gas cost
+      operationId: getQuote
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - inputChainId
+                - inputTokenAddress
+                - outputChainId
+                - outputTokenAddress
+                - inputAmount
+              properties:
+                inputChainId:
+                  type: integer
+                  example: 1
+                inputTokenAddress:
+                  type: string
+                  example: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+                outputChainId:
+                  type: integer
+                  example: 1
+                outputTokenAddress:
+                  type: string
+                  example: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+                inputAmount:
+                  type: string
+                  description: Input amount in token units (not wei)
+                  example: "1000"
+                slippageBps:
+                  type: integer
+                  minimum: 1
+                  maximum: 5000
+                  default: 50
+                  description: Max slippage in basis points
+                userAddress:
+                  type: string
+                  description: User wallet address for personalized quotes
+            examples:
+              sameChain:
+                summary: Same-chain swap (USDC → ETH)
+                value:
+                  inputChainId: 1
+                  inputTokenAddress: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+                  outputChainId: 1
+                  outputTokenAddress: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+                  inputAmount: "1000"
+                  slippageBps: 50
+              crossChain:
+                summary: Cross-chain swap (ETH → SOL)
+                value:
+                  inputChainId: 1
+                  inputTokenAddress: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+                  outputChainId: 101
+                  outputTokenAddress: "So11111111111111111111111111111111111111112"
+                  inputAmount: "0.5"
+                  slippageBps: 100
+      responses:
+        '200':
+          description: Quote with routes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  quoteId:
+                    type: string
+                    description: Quote ID for execution
+                    example: "quote_abc123xyz"
+                  expiresAt:
+                    type: string
+                    format: date-time
+                    description: Quote expiration time
+                  inputToken:
+                    $ref: '#/components/schemas/Token'
+                  outputToken:
+                    $ref: '#/components/schemas/Token'
+                  inputAmount:
+                    type: string
+                    example: "1000"
+                  routes:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SwapRoute'
+                  platformFeeBps:
+                    type: integer
+                    example: 40
+        '400':
+          description: Invalid request
+        '404':
+          description: No routes found
+
+  /api/v1/quote/{quoteId}:
+    get:
+      tags:
+        - Quote
+      summary: Get quote by ID
+      description: Retrieve a previously generated quote
+      operationId: getQuoteById
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: quoteId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Quote details
+        '404':
+          description: Quote not found or expired
+
+  /api/v1/quote/refresh:
+    post:
+      tags:
+        - Quote
+      summary: Refresh a quote
+      description: Get updated pricing for an existing quote
+      operationId: refreshQuote
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - quoteId
+              properties:
+                quoteId:
+                  type: string
+      responses:
+        '200':
+          description: Refreshed quote
+
+  /api/v1/swap:
+    post:
+      tags:
+        - Swap
+      summary: Execute a swap
+      description: |
+        Execute a token swap using a quote.
+        
+        **Prerequisites:**
+        1. Get a quote using `/api/v1/quote`
+        2. Ensure user has approved token spending
+        3. Call this endpoint with the quote ID and selected route
+        
+        **Fees:**
+        - Platform fee: 0.4% (40 bps) deducted from input amount
+        - Gas fees paid by user
+      operationId: executeSwap
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - quoteId
+                - routeIndex
+              properties:
+                quoteId:
+                  type: string
+                  description: Quote ID from /quote endpoint
+                  example: "quote_abc123xyz"
+                routeIndex:
+                  type: integer
+                  description: Index of selected route (0 = best)
+                  example: 0
+                userAddress:
+                  type: string
+                  description: User wallet address
+      responses:
+        '200':
+          description: Swap executed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  swapId:
+                    type: string
+                    example: "swap_xyz789"
+                  status:
+                    type: string
+                    enum: [pending, confirmed, failed]
+                    example: "pending"
+                  txHash:
+                    type: string
+                    example: "0x1234..."
+                  inputAmount:
+                    type: string
+                  outputAmount:
+                    type: string
+                  platformFee:
+                    type: string
+                  estimatedGas:
+                    type: string
+        '400':
+          description: Invalid request or quote expired
+        '402':
+          description: Insufficient balance
+
+  /api/v1/swap/{swapId}:
+    get:
+      tags:
+        - Swap
+      summary: Get swap status
+      description: Get the current status of a swap
+      operationId: getSwapStatus
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: swapId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Swap status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  swapId:
+                    type: string
+                  status:
+                    type: string
+                    enum: [pending, confirming, confirmed, failed]
+                  txHash:
+                    type: string
+                  blockNumber:
+                    type: string
+                  inputAmount:
+                    type: string
+                  outputAmount:
+                    type: string
+                  actualOutputAmount:
+                    type: string
+                    description: Actual received (may differ due to slippage)
+                  platformFee:
+                    type: string
+                  gasFee:
+                    type: string
+                  explorerUrl:
+                    type: string
+                    format: uri
+                  completedAt:
+                    type: string
+                    format: date-time
+        '404':
+          description: Swap not found
+
+  /api/v1/swap/history:
+    get:
+      tags:
+        - Swap
+      summary: Get swap history
+      description: Get user's swap history
+      operationId: getSwapHistory
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: chainId
+          in: query
+          schema:
+            type: integer
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, confirmed, failed]
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/OffsetParam'
+      responses:
+        '200':
+          description: Swap history
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      swaps:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            swapId:
+                              type: string
+                            status:
+                              type: string
+                            inputToken:
+                              $ref: '#/components/schemas/Token'
+                            outputToken:
+                              $ref: '#/components/schemas/Token'
+                            inputAmount:
+                              type: string
+                            outputAmount:
+                              type: string
+                            txHash:
+                              type: string
+                            createdAt:
+                              type: string
+                              format: date-time

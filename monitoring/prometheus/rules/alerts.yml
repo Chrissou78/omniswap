@@ -1,0 +1,87 @@
+groups:
+  - name: omniswap-alerts
+    rules:
+      # High error rate
+      - alert: HighErrorRate
+        expr: |
+          sum(rate(http_requests_total{status=~"5.."}[5m])) 
+          / sum(rate(http_requests_total[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: High error rate detected
+          description: Error rate is above 5% for the last 5 minutes
+
+      # High latency
+      - alert: HighLatency
+        expr: |
+          histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: High latency detected
+          description: 95th percentile latency is above 2 seconds
+
+      # API down
+      - alert: APIDown
+        expr: up{job="omniswap-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: OmniSwap API is down
+          description: API instance {{ $labels.instance }} is down
+
+      # High memory usage
+      - alert: HighMemoryUsage
+        expr: |
+          container_memory_usage_bytes{container="api"} 
+          / container_spec_memory_limit_bytes{container="api"} > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: High memory usage
+          description: Memory usage is above 90%
+
+      # Redis connection issues
+      - alert: RedisDown
+        expr: redis_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: Redis is down
+          description: Redis instance is not responding
+
+      # Database connection pool exhausted
+      - alert: DBConnectionPoolExhausted
+        expr: prisma_pool_connections_idle == 0 and prisma_pool_connections_busy == prisma_pool_size
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: Database connection pool exhausted
+          description: All database connections are in use
+
+      # Worker queue backlog
+      - alert: WorkerQueueBacklog
+        expr: bullmq_queue_waiting > 1000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Worker queue backlog growing
+          description: Queue {{ $labels.queue }} has over 1000 waiting jobs
+
+      # Failed DCA executions
+      - alert: DCAExecutionFailures
+        expr: increase(dca_execution_failures_total[1h]) > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Multiple DCA execution failures
+          description: More than 10 DCA executions failed in the last hour

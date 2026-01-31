@@ -1,0 +1,45 @@
+{
+  "slots": [
+    {
+      "id": "header-banner",
+      "name": "Header Banner",
+      "position": "header",
+      "dimensions": "728x90",
+      "description": "Premium placement at the top of every page",
+      "basePrice": 150,
+      "isActive": true,
+      "sortOrder": 1
+    },
+    {
+      "id": "sidebar-top",
+      "name": "Sidebar Top",
+      "position": "sidebar",
+      "dimensions": "300x250",
+      "description": "High visibility sidebar position",
+      "basePrice": 100,
+      "isActive": true,
+      "sortOrder": 2
+    },
+    {
+      "id": "swap-widget",
+      "name": "Swap Widget Ad",
+      "position": "swap",
+      "dimensions": "300x100",
+      "description": "Displayed next to the swap interface",
+      "basePrice": 120,
+      "isActive": true,
+      "sortOrder": 3
+    },
+    {
+      "id": "footer-banner",
+      "name": "Footer Banner",
+      "position": "footer",
+      "dimensions": "728x90",
+      "description": "Shown at the bottom of pages",
+      "basePrice": 80,
+      "isActive": true,
+      "sortOrder": 4
+    }
+  ],
+  "bookings": []
+}

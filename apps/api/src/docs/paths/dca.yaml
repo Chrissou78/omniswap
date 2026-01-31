@@ -1,0 +1,362 @@
+paths:
+  /api/v1/dca:
+    get:
+      tags:
+        - DCA
+      summary: Get all DCA strategies
+      description: Retrieve all DCA strategies for the authenticated user
+      operationId: getDCAStrategies
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+          description: Comma-separated statuses (ACTIVE,PAUSED,COMPLETED,etc.)
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/OffsetParam'
+      responses:
+        '200':
+          description: List of DCA strategies
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      strategies:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/DCAStrategy'
+    
+    post:
+      tags:
+        - DCA
+      summary: Create a DCA strategy
+      description: |
+        Create a new Dollar-Cost Averaging strategy.
+        
+        **How it works:**
+        - Set an amount to invest per execution
+        - Choose frequency (hourly, daily, weekly, etc.)
+        - Set total number of executions
+        - OmniSwap automatically executes swaps at scheduled times
+        
+        **Frequencies:**
+        - `hourly`: Every hour
+        - `daily`: Every 24 hours
+        - `weekly`: Every 7 days
+        - `biweekly`: Every 14 days
+        - `monthly`: Every 30 days
+        - `custom`: Custom interval (requires `customIntervalMs`)
+        
+        **Protections:**
+        - `maxPriceImpactBps`: Skip if price impact exceeds threshold
+        - `skipOnHighGas`: Skip execution if gas is above `maxGasUsd`
+        
+        **Fees:**
+        Platform fee is 0.4% (40 bps) per execution.
+      operationId: createDCAStrategy
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDCARequest'
+            examples:
+              weeklyEth:
+                summary: Weekly ETH accumulation
+                value:
+                  name: "Weekly ETH DCA"
+                  inputTokenAddress: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+                  inputTokenSymbol: "USDC"
+                  inputTokenDecimals: 6
+                  inputChainId: 1
+                  outputTokenAddress: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+                  outputTokenSymbol: "WETH"
+                  outputTokenDecimals: 18
+                  outputChainId: 1
+                  amountPerExecution: "100"
+                  frequency: "weekly"
+                  totalExecutions: 52
+                  slippageBps: 100
+                  maxPriceImpactBps: 300
+                  skipOnHighGas: true
+                  maxGasUsd: 10
+              dailyBtc:
+                summary: Daily BTC with custom settings
+                value:
+                  name: "Daily WBTC Stack"
+                  inputTokenAddress: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+                  inputTokenSymbol: "USDC"
+                  inputTokenDecimals: 6
+                  inputChainId: 1
+                  outputTokenAddress: "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599"
+                  outputTokenSymbol: "WBTC"
+                  outputTokenDecimals: 8
+                  outputChainId: 1
+                  amountPerExecution: "50"
+                  frequency: "daily"
+                  totalExecutions: 90
+      responses:
+        '201':
+          description: Strategy created successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - $ref: '#/components/schemas/DCAStrategy'
+        '400':
+          description: Validation error
+
+  /api/v1/dca/stats:
+    get:
+      tags:
+        - DCA
+      summary: Get DCA statistics
+      operationId: getDCAStats
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: DCA statistics
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - $ref: '#/components/schemas/DCAStats'
+
+  /api/v1/dca/{strategyId}:
+    get:
+      tags:
+        - DCA
+      summary: Get a specific strategy
+      operationId: getDCAStrategy
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: strategyId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Strategy details
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - $ref: '#/components/schemas/DCAStrategy'
+        '404':
+          description: Strategy not found
+    
+    patch:
+      tags:
+        - DCA
+      summary: Update a strategy
+      description: Update settings for an active or paused strategy
+      operationId: updateDCAStrategy
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: strategyId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDCARequest'
+      responses:
+        '200':
+          description: Strategy updated
+        '404':
+          description: Strategy not found
+    
+    delete:
+      tags:
+        - DCA
+      summary: Cancel a strategy
+      description: Cancel an active or paused strategy
+      operationId: cancelDCAStrategy
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: strategyId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Strategy cancelled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Strategy cancelled"
+        '404':
+          description: Strategy not found
+
+  /api/v1/dca/{strategyId}/pause:
+    post:
+      tags:
+        - DCA
+      summary: Pause a strategy
+      description: Pause an active strategy. Can be resumed later.
+      operationId: pauseDCAStrategy
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: strategyId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Strategy paused
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Strategy paused"
+                  id:
+                    type: string
+                  status:
+                    type: string
+                    example: "paused"
+        '404':
+          description: Strategy not found or cannot be paused
+
+  /api/v1/dca/{strategyId}/resume:
+    post:
+      tags:
+        - DCA
+      summary: Resume a strategy
+      description: Resume a paused strategy
+      operationId: resumeDCAStrategy
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: strategyId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Strategy resumed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Strategy resumed"
+                  id:
+                    type: string
+                  status:
+                    type: string
+                    example: "active"
+                  nextExecutionAt:
+                    type: string
+                    format: date-time
+        '404':
+          description: Strategy not found or cannot be resumed
+
+  /api/v1/dca/{strategyId}/analytics:
+    get:
+      tags:
+        - DCA
+      summary: Get strategy analytics
+      description: Get detailed analytics including execution history and performance
+      operationId: getDCAAnalytics
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: strategyId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Strategy analytics
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - $ref: '#/components/schemas/DCAAnalytics'
+        '404':
+          description: Strategy not found
+
+  /api/v1/dca/{strategyId}/executions:
+    get:
+      tags:
+        - DCA
+      summary: Get strategy executions
+      description: Get execution history for a strategy
+      operationId: getDCAExecutions
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: strategyId
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/OffsetParam'
+      responses:
+        '200':
+          description: Strategy executions
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      executions:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/DCAExecution'
