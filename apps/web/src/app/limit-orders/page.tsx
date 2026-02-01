@@ -79,6 +79,7 @@ import {
 import { cn, formatNumber, formatCurrency, formatDate, shortenAddress } from '@/lib/utils';
 import Image from 'next/image';
 import { useWallet } from '@/hooks/useWallet';
+import { useTokenStore } from '@/stores/tokenStore';
 import { TokenSelector } from '@/components/swap/TokenSelector';
 import { ChainSelector } from '@/components/wallet/ChainSelector';
 import { toast } from 'sonner';
@@ -167,6 +168,7 @@ const EXPIRY_OPTIONS = [
 export default function LimitOrdersPage() {
   const queryClient = useQueryClient();
   const { isConnected, address } = useWallet();
+  const { getTokensByChain } = useTokenStore();
   const [activeTab, setActiveTab] = useState<'create' | 'active' | 'history'>('create');
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<LimitOrder | null>(null);
@@ -766,27 +768,37 @@ export default function LimitOrdersPage() {
       </Tabs>
 
       {/* Token Selectors */}
-      <TokenSelector
-        open={showFromTokenSelector}
-        onClose={() => setShowFromTokenSelector(false)}
-        onSelect={(token) => {
-          setFromToken(token);
-          setShowFromTokenSelector(false);
-        }}
-        chainId={fromChainId}
-        excludeToken={toToken}
-      />
+      {showFromTokenSelector && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowFromTokenSelector(false)}>
+          <div className="bg-background rounded-lg p-4 max-w-md w-full max-h-[80vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
+            <TokenSelector
+              tokens={getTokensByChain(String(fromChainId))}
+              onSelect={(token) => {
+                setFromToken(token);
+                setShowFromTokenSelector(false);
+              }}
+              chainId={fromChainId}
+              excludeAddresses={toToken ? [toToken.address] : []}
+            />
+          </div>
+        </div>
+      )}
 
-      <TokenSelector
-        open={showToTokenSelector}
-        onClose={() => setShowToTokenSelector(false)}
-        onSelect={(token) => {
-          setToToken(token);
-          setShowToTokenSelector(false);
-        }}
-        chainId={toChainId}
-        excludeToken={fromToken}
-      />
+      {showToTokenSelector && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowToTokenSelector(false)}>
+          <div className="bg-background rounded-lg p-4 max-w-md w-full max-h-[80vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
+            <TokenSelector
+              tokens={getTokensByChain(String(toChainId))}
+              onSelect={(token) => {
+                setToToken(token);
+                setShowToTokenSelector(false);
+              }}
+              chainId={toChainId}
+              excludeAddresses={fromToken ? [fromToken.address] : []}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Cancel Confirmation Dialog */}
       <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
@@ -1000,5 +1012,8 @@ function OrderRow({
     </TableRow>
   );
 }
+
+
+
 
 
