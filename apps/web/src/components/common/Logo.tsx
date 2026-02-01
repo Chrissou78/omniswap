@@ -13,7 +13,7 @@ import {
 } from '@/services/logoService';
 
 // Local type for logo detection result
-type LogoResult = { valid: boolean; url: string };
+type LogoResult = { valid?: boolean; url: string; source?: string; isCustom?: boolean };
 import { Token, Chain } from '@/types';
 
 // ============================================
@@ -385,6 +385,7 @@ export const ChainLogo: React.FC<ChainLogoProps> = ({
     </div>
   );
 };
+
 
 
 
