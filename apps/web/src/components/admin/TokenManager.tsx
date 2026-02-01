@@ -35,7 +35,7 @@ import {
 } from '@/services/tokenService';
 import {
   getTokenLogo,
-  autoDetectTokenLogo,
+  autoDetectTokenLogoWithResult,
   exportLogoRegistry,
 } from '@/services/logoService';
 
@@ -83,7 +83,7 @@ const EditableTokenLogo: React.FC<EditableTokenLogoProps> = ({
   const handleAutoDetect = async () => {
     setIsLoading(true);
     try {
-      const result = await autoDetectTokenLogo(token);
+      const result = await autoDetectTokenLogoWithResult(token);
       if (result.valid) {
         onUpdate(result.url);
       }
@@ -797,3 +797,4 @@ const TokenManager: React.FC = () => {
 };
 
 export default TokenManager;
+

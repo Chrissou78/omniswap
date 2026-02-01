@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { Upload, X, Loader2, RefreshCw } from 'lucide-react';
 import { 
-  autoDetectTokenLogo, 
+  autoDetectTokenLogoWithResult, 
   autoDetectChainLogo, 
   uploadCustomLogo,
   clearCustomLogo,
@@ -59,7 +59,7 @@ export const TokenLogo: React.FC<TokenLogoProps> = ({
         }
         
         // Auto-detect
-        const result = await autoDetectTokenLogo(token);
+        const result = await autoDetectTokenLogoWithResult(token);
         if (mounted) {
           setLogoResult(result);
           if (result.url && onLogoChange) {
@@ -99,13 +99,13 @@ export const TokenLogo: React.FC<TokenLogoProps> = ({
     clearCustomLogo('token', cacheKey);
     setLogoResult(null);
     // Re-trigger auto-detect
-    autoDetectTokenLogo(token).then(setLogoResult);
+    autoDetectTokenLogoWithResult(token).then(setLogoResult);
   };
   
   const handleRetry = () => {
     setError(false);
     setIsLoading(true);
-    autoDetectTokenLogo(token).then(result => {
+    autoDetectTokenLogoWithResult(token).then(result => {
       setLogoResult(result);
       setIsLoading(false);
     });
@@ -381,3 +381,4 @@ export const ChainLogo: React.FC<ChainLogoProps> = ({
     </div>
   );
 };
+
