@@ -88,10 +88,10 @@ export const TokenLogo: React.FC<TokenLogoProps> = ({
     
     setIsLoading(true);
     try {
-      const result = await uploadAndSetTokenLogo(file, 'token', cacheKey);
-      setLogoResult(result);
+      const url = await uploadAndSetTokenLogo(file, token.chainId, token.address);
+      setLogoResult({ url, source: 'custom', isCustom: true });
       setShowUpload(false);
-      if (onLogoChange) onLogoChange(result.url);
+      if (onLogoChange) onLogoChange(url);
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to upload image');
     } finally {
@@ -282,7 +282,7 @@ export const ChainLogo: React.FC<ChainLogoProps> = ({
     try {
       const result = await uploadAndSetTokenLogo(file, 'chain', String(chainId));
       setLogoResult(result);
-      if (onLogoChange) onLogoChange(result.url);
+      if (onLogoChange) onLogoChange(url);
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to upload image');
     } finally {
@@ -385,6 +385,7 @@ export const ChainLogo: React.FC<ChainLogoProps> = ({
     </div>
   );
 };
+
 
 
 
