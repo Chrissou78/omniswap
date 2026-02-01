@@ -12,36 +12,10 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TokenSelector } from '@/components/swap/TokenSelector';
-import chainsConfig from '@/config/chains.json';
-import { Chain } from '@omniswap/types';
-
-// Map chains.json to Chain type
-const chains: Chain[] = chainsConfig.chains.map((c: any) => ({
-  id: String(c.id),
-  chainId: c.id,
-  name: c.name,
-  type: (c.type === 'evm' ? 'EVM' : c.type === 'solana' ? 'SOLANA' : c.type === 'sui' ? 'SUI' : 'EVM') as 'EVM' | 'SOLANA' | 'SUI' | 'CEX',
-  nativeToken: {
-    symbol: c.symbol,
-    name: c.name,
-    decimals: c.type === 'solana' || c.type === 'sui' ? 9 : 18,
-    address: c.wrappedNativeAddress || '0x0000000000000000000000000000000000000000',
-  },
-  rpcUrls: [c.rpcDefault],
-  explorerUrl: c.explorerUrl,
-  iconUrl: /chains/.svg,
-  isTestnet: c.isTestnet || false,
-  isActive: true,
-  avgBlockTime: c.type === 'solana' ? 0.4 : c.type === 'sui' ? 0.5 : 12,
-  confirmations: c.type === 'solana' ? 32 : c.type === 'sui' ? 1 : 12,
-  color: c.color,
-}));
-  explorerUrl: c.explorerUrl,
-  type: c.type as 'evm' | 'solana' | 'sui',
-  color: c.color,
-}));
 import { ChainSelector } from '@/components/wallet/ChainSelector';
 import { useTokenStore } from '@/stores/tokenStore';
+import chainsConfig from '@/config/chains.json';
+import { Chain } from '@omniswap/types';
 import {
   Calendar,
   Clock,
@@ -58,6 +32,28 @@ import {
 } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import Link from 'next/link';
+
+// Map chains.json to Chain type
+const chains: Chain[] = chainsConfig.chains.map((c: any) => ({
+  id: String(c.id),
+  chainId: c.id,
+  name: c.name,
+  type: (c.type === 'evm' ? 'EVM' : c.type === 'solana' ? 'SOLANA' : c.type === 'sui' ? 'SUI' : 'EVM') as 'EVM' | 'SOLANA' | 'SUI' | 'CEX',
+  nativeToken: {
+    symbol: c.symbol,
+    name: c.name,
+    decimals: c.type === 'solana' || c.type === 'sui' ? 9 : 18,
+    address: c.wrappedNativeAddress || '0x0000000000000000000000000000000000000000',
+  },
+  rpcUrls: [c.rpcDefault],
+  explorerUrl: c.explorerUrl,
+  iconUrl: `/chains/${c.trustwalletId || c.id}.svg`,
+  isTestnet: c.isTestnet || false,
+  isActive: true,
+  avgBlockTime: c.type === 'solana' ? 0.4 : c.type === 'sui' ? 0.5 : 12,
+  confirmations: c.type === 'solana' ? 32 : c.type === 'sui' ? 1 : 12,
+  color: c.color,
+}));
 
 export default function DCAPage() {
   const { isConnected, address } = useWallet();
@@ -562,6 +558,7 @@ export default function DCAPage() {
     </div>
   );
 }
+
 
 
 
