@@ -180,7 +180,7 @@ const EXPLORER_URLS: Record<string, string> = {
 };
 
 export default function PortfolioPage() {
-  const { isConnected, addresses, connect } = useWallet();
+  const { isConnected, address, connect } = useWallet();
   const [timeframe, setTimeframe] = useState('30d');
   const [hideSmallBalances, setHideSmallBalances] = useState(false);
   const [showValues, setShowValues] = useState(true);
@@ -198,13 +198,13 @@ export default function PortfolioPage() {
     refetch: refetchPortfolio,
     isFetching: isRefetching,
   } = useQuery({
-    queryKey: ['portfolio', addresses],
+    queryKey: ['portfolio', address ? [address] : []],
     queryFn: async () => {
       const res = await fetch('/api/v1/portfolio/summary');
       if (!res.ok) throw new Error('Failed to fetch portfolio');
       return res.json() as Promise<{ portfolio: PortfolioSummary }>;
     },
-    enabled: isConnected && addresses.length > 0,
+    enabled: isConnected && address ? 1 : 0 > 0,
     refetchInterval: 30000,
   });
 
@@ -1203,3 +1203,4 @@ export default function PortfolioPage() {
     </div>
   );
 }
+
