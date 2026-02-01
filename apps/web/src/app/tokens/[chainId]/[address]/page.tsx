@@ -1,7 +1,7 @@
 // apps/web/src/app/tokens/[chainId]/[address]/page.tsx
 import { Suspense } from 'react';
 import { TokenAuditView } from '@/components/tokens/TokenAuditView';
-import { Skeleton } from '@/components/ui/Skeleton';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface TokenPageProps {
   params: {
