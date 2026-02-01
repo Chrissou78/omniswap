@@ -6,10 +6,14 @@ import { Upload, X, Loader2, RefreshCw } from 'lucide-react';
 import { 
   autoDetectTokenLogoWithResult, 
   autoDetectChainLogo, 
-  uploadCustomLogo,
-  clearCustomLogo,
-  type LogoResult 
+  uploadAndSetTokenLogo,
+  deleteTokenLogo,
+  getTokenLogo,
+  getChainLogo,
 } from '@/services/logoService';
+
+// Local type for logo detection result
+type LogoResult = { valid: boolean; url: string };
 import { Token, Chain } from '@/types';
 
 // ============================================
@@ -84,7 +88,7 @@ export const TokenLogo: React.FC<TokenLogoProps> = ({
     
     setIsLoading(true);
     try {
-      const result = await uploadCustomLogo(file, 'token', cacheKey);
+      const result = await uploadAndSetTokenLogo(file, 'token', cacheKey);
       setLogoResult(result);
       setShowUpload(false);
       if (onLogoChange) onLogoChange(result.url);
@@ -96,7 +100,7 @@ export const TokenLogo: React.FC<TokenLogoProps> = ({
   };
   
   const handleClearCustom = () => {
-    clearCustomLogo('token', cacheKey);
+    deleteTokenLogo('token', cacheKey);
     setLogoResult(null);
     // Re-trigger auto-detect
     autoDetectTokenLogoWithResult(token).then(setLogoResult);
@@ -276,7 +280,7 @@ export const ChainLogo: React.FC<ChainLogoProps> = ({
     
     setIsLoading(true);
     try {
-      const result = await uploadCustomLogo(file, 'chain', String(chainId));
+      const result = await uploadAndSetTokenLogo(file, 'chain', String(chainId));
       setLogoResult(result);
       if (onLogoChange) onLogoChange(result.url);
     } catch (err) {
@@ -287,7 +291,7 @@ export const ChainLogo: React.FC<ChainLogoProps> = ({
   };
   
   const handleClearCustom = () => {
-    clearCustomLogo('chain', String(chainId));
+    deleteTokenLogo('chain', String(chainId));
     setLogoResult(null);
     autoDetectChainLogo(chainId).then(setLogoResult);
   };
@@ -381,4 +385,6 @@ export const ChainLogo: React.FC<ChainLogoProps> = ({
     </div>
   );
 };
+
+
 
