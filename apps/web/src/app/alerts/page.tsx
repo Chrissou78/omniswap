@@ -643,7 +643,7 @@ export default function PriceAlertsPage() {
 
   // State
   const [activeTab, setActiveTab] = useState('create');
-  const [selectedChainId, setSelectedChainId] = useState<number>(1);
+  const [selectedChainId, setSelectedChainId] = useState<number | string>(1);
   const [selectedToken, setSelectedToken] = useState<Token | null>(null);
   const [alertType, setAlertType] = useState<'above' | 'below' | 'percent_change'>('above');
   const [targetPrice, setTargetPrice] = useState('');
@@ -1508,6 +1508,7 @@ export default function PriceAlertsPage() {
     </div>
   );
 }
+
 
 
 
