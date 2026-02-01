@@ -10,7 +10,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdownMenu';
+} from '@/components/ui/dropdown-menu';
 import { ChevronDown, Check } from 'lucide-react';
 import { Chain } from '@omniswap/types';
 
