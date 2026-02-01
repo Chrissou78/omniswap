@@ -1,4 +1,4 @@
-// apps/web/src/lib/utils.ts
+﻿// apps/web/src/lib/utils.ts
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -14,9 +14,9 @@ export function formatNumber(
   }
 ): string {
   const num = typeof value === 'string' ? parseFloat(value) : value;
-  
+
   if (isNaN(num)) return '0';
-  
+
   if (options?.compact && num >= 1000) {
     const formatter = new Intl.NumberFormat('en-US', {
       notation: 'compact',
@@ -24,7 +24,7 @@ export function formatNumber(
     });
     return formatter.format(num);
   }
-  
+
   const decimals = options?.decimals ?? 4;
   return num.toLocaleString('en-US', {
     minimumFractionDigits: 0,
@@ -34,9 +34,7 @@ export function formatNumber(
 
 export function formatUSD(value: number | string): string {
   const num = typeof value === 'string' ? parseFloat(value) : value;
-  
-  if (isNaN(num)) return '$0.00';
-  
+  if (isNaN(num)) return '\.00';
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
@@ -47,11 +45,33 @@ export function formatUSD(value: number | string): string {
 
 export function formatAddress(address: string, chars = 4): string {
   if (!address) return '';
-  return `${address.slice(0, chars + 2)}...${address.slice(-chars)}`;
+  return \\...\\;
 }
 
 export function formatTime(seconds: number): string {
-  if (seconds < 60) return `${seconds}s`;
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
-  return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
+  if (seconds < 60) return \\s\;
+  if (seconds < 3600) return \\m\;
+  return \\h \m\;
+}
+
+// Aliases for compatibility
+export const formatCurrency = formatUSD;
+export const shortenAddress = formatAddress;
+
+export function formatPercent(value: number): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'percent',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value / 100);
+}
+
+export function formatDate(date: Date | string | number): string {
+  return new Intl.DateTimeFormat('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(date));
 }
