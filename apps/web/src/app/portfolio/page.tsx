@@ -204,7 +204,7 @@ export default function PortfolioPage() {
       if (!res.ok) throw new Error('Failed to fetch portfolio');
       return res.json() as Promise<{ portfolio: PortfolioSummary }>;
     },
-    enabled: isConnected && address ? 1 : 0 > 0,
+    enabled: isConnected && !!address,
     refetchInterval: 30000,
   });
 
@@ -1203,4 +1203,5 @@ export default function PortfolioPage() {
     </div>
   );
 }
+
 
