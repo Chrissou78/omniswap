@@ -1,4 +1,4 @@
-﻿// apps/web/src/lib/utils.ts
+// apps/web/src/lib/utils.ts
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -34,7 +34,7 @@ export function formatNumber(
 
 export function formatUSD(value: number | string): string {
   const num = typeof value === 'string' ? parseFloat(value) : value;
-  if (isNaN(num)) return '\.00';
+  if (isNaN(num)) return '$0.00';
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
@@ -45,13 +45,13 @@ export function formatUSD(value: number | string): string {
 
 export function formatAddress(address: string, chars = 4): string {
   if (!address) return '';
-  return \\...\\;
+  return address.slice(0, chars + 2) + '...' + address.slice(-chars);
 }
 
 export function formatTime(seconds: number): string {
-  if (seconds < 60) return \\s\;
-  if (seconds < 3600) return \\m\;
-  return \\h \m\;
+  if (seconds < 60) return seconds + 's';
+  if (seconds < 3600) return Math.floor(seconds / 60) + 'm';
+  return Math.floor(seconds / 3600) + 'h ' + Math.floor((seconds % 3600) / 60) + 'm';
 }
 
 // Aliases for compatibility
