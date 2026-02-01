@@ -13,7 +13,25 @@ import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TokenSelector } from '@/components/swap/TokenSelector';
 import chainsConfig from '@/config/chains.json';
-const chains = chainsConfig.chains;
+import { Chain } from '@omniswap/types';
+
+// Map chains.json to Chain type
+const chains: Chain[] = chainsConfig.chains.map((c: any) => ({
+  chainId: c.id,
+  name: c.name,
+  symbol: c.symbol,
+  nativeToken: {
+    symbol: c.symbol,
+    name: c.name,
+    decimals: 18,
+    address: '0x0000000000000000000000000000000000000000',
+  },
+  rpcUrls: [c.rpcDefault],
+  iconUrl: '',
+  explorerUrl: c.explorerUrl,
+  type: c.type as 'evm' | 'solana' | 'sui',
+  color: c.color,
+}));
 import { ChainSelector } from '@/components/wallet/ChainSelector';
 import { useTokenStore } from '@/stores/tokenStore';
 import {
@@ -536,5 +554,6 @@ export default function DCAPage() {
     </div>
   );
 }
+
 
 
