@@ -255,11 +255,13 @@ export const ChainLogo: React.FC<ChainLogoProps> = ({
       setError(false);
       
       try {
-        const result = await autoDetectChainLogo(chainId);
+        const url = await autoDetectChainLogo(chainId);
         if (mounted) {
-          setLogoResult(result);
-          if (result.url && onLogoChange) {
-            onLogoChange(result.url);
+          if (url) {
+            setLogoResult({ url, source: 'auto', isCustom: false });
+            if (onLogoChange) {
+              onLogoChange(url);
+            }
           }
         }
       } catch (e) {
@@ -385,6 +387,8 @@ export const ChainLogo: React.FC<ChainLogoProps> = ({
     </div>
   );
 };
+
+
 
 
 
