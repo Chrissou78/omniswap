@@ -155,7 +155,7 @@ interface CreateAlertInput {
 // Constants
 // ============================================================================
 
-const CHAIN_INFO: Record<number, { name: string; icon: string; color: string }> = {
+const CHAIN_INFO: Record<number | string, { name: string; icon: string; color: string }> = {
   1: { name: 'Ethereum', icon: '/chains/ethereum.svg', color: '#627EEA' },
   56: { name: 'BNB Chain', icon: '/chains/bnb.svg', color: '#F0B90B' },
   137: { name: 'Polygon', icon: '/chains/polygon.svg', color: '#8247E5' },
@@ -1508,6 +1508,7 @@ export default function PriceAlertsPage() {
     </div>
   );
 }
+
 
 
 
