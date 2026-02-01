@@ -90,9 +90,12 @@ interface Token {
   symbol: string;
   name: string;
   decimals: number;
-  chainId: string;
+  chainId?: number | string;
   logoURI?: string;
+  logoUrl?: string;
   price?: number;
+  priceUsd?: number;
+  verified?: boolean;
 }
 
 interface LimitOrder {
@@ -1012,6 +1015,7 @@ function OrderRow({
     </TableRow>
   );
 }
+
 
 
 
