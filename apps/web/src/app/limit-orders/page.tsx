@@ -166,7 +166,7 @@ const EXPIRY_OPTIONS = [
 
 export default function LimitOrdersPage() {
   const queryClient = useQueryClient();
-  const { isConnected, activeWallet } = useWallet();
+  const { isConnected, address } = useWallet();
   const [activeTab, setActiveTab] = useState<'create' | 'active' | 'history'>('create');
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<LimitOrder | null>(null);
@@ -1000,4 +1000,5 @@ function OrderRow({
     </TableRow>
   );
 }
+
 
