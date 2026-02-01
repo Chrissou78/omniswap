@@ -80,7 +80,7 @@ import { cn, formatNumber, formatCurrency, formatDate, shortenAddress } from '@/
 import Image from 'next/image';
 import { useWallet } from '@/hooks/useWallet';
 import { TokenSelector } from '@/components/swap/TokenSelector';
-import { ChainSelector } from '@/components/swap/ChainSelector';
+import { ChainSelector } from '@/components/wallet/ChainSelector';
 import { toast } from 'sonner';
 
 // Types
@@ -1000,3 +1000,4 @@ function OrderRow({
     </TableRow>
   );
 }
+
