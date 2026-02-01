@@ -58,7 +58,7 @@ const chains: Chain[] = chainsConfig.chains.map((c: any) => ({
 export default function DCAPage() {
   const { isConnected, address } = useWallet();
   const queryClient = useQueryClient();
-  const { tokens } = useTokenStore();
+  const { getTokensByChain } = useTokenStore();
 
   const [activeTab, setActiveTab] = useState('strategies');
 
@@ -367,7 +367,7 @@ export default function DCAPage() {
                       onSelect={(chain) => setInputChainId(chain.chainId)}
                     />
                     <TokenSelector
-                      tokens={tokens.filter((t) => t.chainId === inputChainId)}
+                      tokens={getTokensByChain(String(inputChainId))}
                       selectedToken={inputToken}
                       onSelect={setInputToken}
                     />
@@ -384,7 +384,7 @@ export default function DCAPage() {
                       onSelect={(chain) => setOutputChainId(chain.chainId)}
                     />
                     <TokenSelector
-                      tokens={tokens.filter((t) => t.chainId === outputChainId)}
+                      tokens={getTokensByChain(String(outputChainId))}
                       selectedToken={outputToken}
                       onSelect={setOutputToken}
                     />
@@ -558,6 +558,7 @@ export default function DCAPage() {
     </div>
   );
 }
+
 
 
 
