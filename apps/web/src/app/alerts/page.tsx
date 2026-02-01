@@ -1450,7 +1450,7 @@ export default function PriceAlertsPage() {
             <TokenSelector
               chainId={selectedChainId}
               onSelect={(token) => {
-                setSelectedToken(token);
+                setSelectedToken({ ...token, chainId: token.chainId ?? selectedChainId });
                 setShowTokenSelector(false);
               }}
             />
@@ -1508,4 +1508,5 @@ export default function PriceAlertsPage() {
     </div>
   );
 }
+
 
