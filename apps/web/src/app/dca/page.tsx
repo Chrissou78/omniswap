@@ -17,17 +17,25 @@ import { Chain } from '@omniswap/types';
 
 // Map chains.json to Chain type
 const chains: Chain[] = chainsConfig.chains.map((c: any) => ({
+  id: String(c.id),
   chainId: c.id,
   name: c.name,
-  symbol: c.symbol,
+  type: (c.type === 'evm' ? 'EVM' : c.type === 'solana' ? 'SOLANA' : c.type === 'sui' ? 'SUI' : 'EVM') as 'EVM' | 'SOLANA' | 'SUI' | 'CEX',
   nativeToken: {
     symbol: c.symbol,
     name: c.name,
-    decimals: 18,
-    address: '0x0000000000000000000000000000000000000000',
+    decimals: c.type === 'solana' || c.type === 'sui' ? 9 : 18,
+    address: c.wrappedNativeAddress || '0x0000000000000000000000000000000000000000',
   },
   rpcUrls: [c.rpcDefault],
-  iconUrl: '',
+  explorerUrl: c.explorerUrl,
+  iconUrl: /chains/.svg,
+  isTestnet: c.isTestnet || false,
+  isActive: true,
+  avgBlockTime: c.type === 'solana' ? 0.4 : c.type === 'sui' ? 0.5 : 12,
+  confirmations: c.type === 'solana' ? 32 : c.type === 'sui' ? 1 : 12,
+  color: c.color,
+}));
   explorerUrl: c.explorerUrl,
   type: c.type as 'evm' | 'solana' | 'sui',
   color: c.color,
@@ -554,6 +562,7 @@ export default function DCAPage() {
     </div>
   );
 }
+
 
 
 
