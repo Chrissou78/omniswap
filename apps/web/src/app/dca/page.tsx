@@ -12,6 +12,8 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TokenSelector } from '@/components/swap/TokenSelector';
+import chainsConfig from '@/config/chains.json';
+const chains = chainsConfig.chains;
 import { ChainSelector } from '@/components/wallet/ChainSelector';
 import { useTokenStore } from '@/stores/tokenStore';
 import {
@@ -34,7 +36,7 @@ import Link from 'next/link';
 export default function DCAPage() {
   const { isConnected, address } = useWallet();
   const queryClient = useQueryClient();
-  const { tokens, chains } = useTokenStore();
+  const { tokens } = useTokenStore();
 
   const [activeTab, setActiveTab] = useState('strategies');
 
@@ -534,3 +536,5 @@ export default function DCAPage() {
     </div>
   );
 }
+
+
