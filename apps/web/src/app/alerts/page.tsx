@@ -242,7 +242,7 @@ async function fetchAlertHistory(): Promise<AlertHistory[]> {
   return data.history;
 }
 
-async function fetchTokenPrice(chainId: number, address: string): Promise<{ price: number; priceChange24h: number }> {
+async function fetchTokenPrice(chainId: number | string, address: string): Promise<{ price: number; priceChange24h: number }> {
   const response = await fetch(`/api/v1/tokens/${chainId}/${address}`, {
     credentials: 'include',
   });
@@ -1508,6 +1508,7 @@ export default function PriceAlertsPage() {
     </div>
   );
 }
+
 
 
 
