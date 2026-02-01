@@ -626,7 +626,7 @@ function ConnectWalletPrompt() {
       <p className="text-muted-foreground mb-6 max-w-md">
         Connect your wallet to create and manage price alerts for your favorite tokens across all supported chains.
       </p>
-      <Button size="lg" onClick={connect}>
+      <Button size="lg" onClick={() => connect()}>
         Connect Wallet
       </Button>
     </div>
@@ -1508,3 +1508,4 @@ export default function PriceAlertsPage() {
     </div>
   );
 }
+
