@@ -4,17 +4,19 @@ import { TokenAuditView } from '@/components/tokens/TokenAuditView';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface TokenPageProps {
-  params: {
+  params: Promise<{
     chainId: string;
     address: string;
-  };
+  }>;
 }
 
-export default function TokenPage({ params }: TokenPageProps) {
+export default async function TokenPage({ params }: TokenPageProps) {
+  const { chainId, address } = await params;
+  
   return (
     <div className="container max-w-4xl mx-auto py-8 px-4">
       <Suspense fallback={<TokenAuditSkeleton />}>
-        <TokenAuditView chainId={params.chainId} address={params.address} />
+        <TokenAuditView chainId={chainId} address={address} />
       </Suspense>
     </div>
   );
