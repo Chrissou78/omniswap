@@ -40,6 +40,27 @@ class ApiClient {
     return data.data as T;
   }
 
+
+  // Generic GET method
+  async get<T = any>(endpoint: string): Promise<{ data: T }> {
+    const data = await this.fetch<T>(endpoint);
+    return { data };
+  }
+
+  // Generic POST method  
+  async post<T = any>(endpoint: string, body?: any): Promise<{ data: T }> {
+    const data = await this.fetch<T>(endpoint, {
+      method: 'POST',
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    return { data };
+  }
+
+  // Generic DELETE method
+  async delete<T = any>(endpoint: string): Promise<{ data: T }> {
+    const data = await this.fetch<T>(endpoint, { method: 'DELETE' });
+    return { data };
+  }
   // ============ QUOTES ============
 
   async getQuote(request: QuoteRequest): Promise<QuoteResponse> {
@@ -128,3 +149,4 @@ class ApiClient {
 }
 
 export const api = new ApiClient(API_URL);
+
