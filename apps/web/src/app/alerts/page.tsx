@@ -80,7 +80,7 @@ interface Token {
   name: string;
   decimals: number;
   logoURI?: string;
-  chainId: number;
+  chainId: number | string;
   price?: number;
   priceChange24h?: number;
 }
@@ -92,7 +92,7 @@ interface PriceAlert {
   tokenSymbol: string;
   tokenName: string;
   tokenLogoURI?: string;
-  chainId: number;
+  chainId: number | string;
   alertType: 'above' | 'below' | 'percent_change';
   targetPrice?: number;
   targetPercentChange?: number;
@@ -117,7 +117,7 @@ interface AlertHistory {
   alertId: string;
   tokenSymbol: string;
   tokenLogoURI?: string;
-  chainId: number;
+  chainId: number | string;
   alertType: 'above' | 'below' | 'percent_change';
   targetPrice?: number;
   targetPercentChange?: number;
@@ -138,7 +138,7 @@ interface CreateAlertInput {
   tokenSymbol: string;
   tokenName: string;
   tokenLogoURI?: string;
-  chainId: number;
+  chainId: number | string;
   alertType: 'above' | 'below' | 'percent_change';
   targetPrice?: number;
   targetPercentChange?: number;
@@ -1450,7 +1450,7 @@ export default function PriceAlertsPage() {
             <TokenSelector
               chainId={selectedChainId}
               onSelect={(token) => {
-                setSelectedToken({ ...token, chainId: token.chainId ?? selectedChainId });
+                setSelectedToken({ ...token, chainId: token.chainId ?? selectedChainId } as Token);
                 setShowTokenSelector(false);
               }}
             />
@@ -1508,6 +1508,7 @@ export default function PriceAlertsPage() {
     </div>
   );
 }
+
 
 
 
