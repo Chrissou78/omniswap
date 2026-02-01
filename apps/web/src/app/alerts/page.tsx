@@ -200,7 +200,7 @@ const COOLDOWN_OPTIONS = [
   { value: 1440, label: '24 hours' },
 ];
 
-const EXPLORER_URLS: Record<number, string> = {
+const EXPLORER_URLS: Record<number | string, string> = {
   1: 'https://etherscan.io/token/',
   56: 'https://bscscan.com/token/',
   137: 'https://polygonscan.com/token/',
@@ -1508,6 +1508,7 @@ export default function PriceAlertsPage() {
     </div>
   );
 }
+
 
 
 
