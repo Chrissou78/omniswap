@@ -75,3 +75,5 @@ export function formatDate(date: Date | string | number): string {
     minute: '2-digit',
   }).format(new Date(date));
 }
+
+export const truncateAddress = formatAddress;
