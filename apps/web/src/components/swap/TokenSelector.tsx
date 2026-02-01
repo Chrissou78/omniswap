@@ -12,15 +12,18 @@ interface Token {
   name: string;
   decimals: number;
   logoURI?: string;
-  chainId?: number;
+  logoUrl?: string;
+  chainId?: number | string;
   price?: number;
+  priceUsd?: number;
+  verified?: boolean;
 }
 
 interface TokenSelectorProps {
   tokens?: Token[];
   onSelect: (token: Token) => void;
   selectedToken?: Token | null;
-  chainId?: number;
+  chainId?: number | string;
   excludeAddresses?: string[];
 }
 
@@ -93,3 +96,5 @@ export function TokenSelector({
     </div>
   );
 }
+
+
