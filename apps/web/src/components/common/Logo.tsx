@@ -295,7 +295,13 @@ export const ChainLogo: React.FC<ChainLogoProps> = ({
   const handleClearCustom = () => {
     deleteTokenLogo('chain', String(chainId));
     setLogoResult(null);
-    autoDetectChainLogo(chainId).then(setLogoResult);
+    autoDetectChainLogo(chainId).then((url) => {
+      if (url) {
+        setLogoResult({ url, source: 'auto', isCustom: false });
+      } else {
+        setLogoResult(null);
+      }
+    });
   };
   
   // Loading
@@ -387,6 +393,7 @@ export const ChainLogo: React.FC<ChainLogoProps> = ({
     </div>
   );
 };
+
 
 
 
