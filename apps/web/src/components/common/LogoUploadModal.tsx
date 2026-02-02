@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useCallback } from 'react';
 import { X, Upload, Image as ImageIcon, Link, Loader2, Check, AlertCircle } from 'lucide-react';
-import { uploadCustomLogo } from '@/services/logoService';
+import { uploadAndSetTokenLogo } from '@/services/logoService';
 
 interface LogoUploadModalProps {
   isOpen: boolean;
@@ -62,8 +62,8 @@ export const LogoUploadModal: React.FC<LogoUploadModalProps> = ({
       reader.readAsDataURL(file);
       
       // Upload
-      const result = await uploadCustomLogo(file, type, id);
-      onUpload(result.url);
+      const url = await uploadAndSetTokenLogo(file, type, id);
+        onUpload(url);
       handleClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to upload image');
@@ -123,8 +123,8 @@ export const LogoUploadModal: React.FC<LogoUploadModalProps> = ({
       const blob = await response.blob();
       const file = new File([blob], 'logo.png', { type: blob.type });
       
-      const result = await uploadCustomLogo(file, type, id);
-      onUpload(result.url);
+      const url = await uploadAndSetTokenLogo(file, type, id);
+        onUpload(url);
       handleClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Invalid URL or failed to load image');
@@ -287,3 +287,5 @@ export const LogoUploadModal: React.FC<LogoUploadModalProps> = ({
     </div>
   );
 };
+
+
