@@ -7,8 +7,9 @@
     "dev": "turbo run dev",
     "dev:web": "pnpm --filter @omniswap/web dev",
     "dev:mobile": "pnpm --filter @omniswap/mobile dev",
-    "build": "pnpm --filter @omniswap/web build",
-    "build:web": "pnpm --filter @omniswap/web build",
+    "prebuild": "pnpm --filter @omniswap/shared build",
+    "build": "turbo run build --filter @omniswap/web",
+    "build:shared": "turbo run build --filter @omniswap/shared",
     "test": "turbo run test",
     "lint": "turbo run lint",
     "clean": "turbo run clean && rm -rf node_modules",
@@ -29,5 +30,15 @@
   "engines": {
     "node": ">=18.0.0",
     "pnpm": ">=8.0.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "tiny-secp256k1": "^1.1.7",
+      "bigint-buffer": "^1.1.5"
+    },
+    "neverBuiltDependencies": [
+      "tiny-secp256k1",
+      "bigint-buffer"
+    ]
   }
 }

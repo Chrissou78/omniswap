@@ -12,9 +12,12 @@ import { getTokenPrice, type TokenPrice } from '../../services/priceService';
 import { estimateSwapGas, formatGasCost, type GasEstimate } from '../../services/gasService';
 import { getTokenSecurity, type TokenAuditResult } from '../../services/goPlusService';
 
+// Shared package - sync helpers
+import { CHAINS, getTokensByChainId } from '@omniswap/shared';
+import type { Chain, Token } from '@omniswap/shared';
+
 // Config
-import { CHAINS, getTokensByChainId, sortTokensByBalance } from '../../config';
-import type { Chain, Token } from '../../types';
+import { sortTokensByBalance } from '../../config';
 
 // Local imports
 import { useSuiWallet, useEvmTokenBalances } from './hooks';
@@ -616,17 +619,20 @@ export function SwapWidgetCore() {
     const custom = customTokens
       .filter(t => t.chainId === String(inputChain.id))
       .map(t => ({
-        id: t.address,
+        chainId: String(inputChain.id),
+        address: t.address,
         symbol: t.symbol,
         name: t.name,
         decimals: t.decimals,
-        address: t.address,
-        chainId: String(inputChain.id),
-        logoUrl: '/tokens/unknown.png',
-        isCustom: true as const,
-        isVerified: false as const,
+        logoURI: t.logoUrl || null,  // Convert logoUrl to logoURI and ensure it's null, not undefined
+        tags: ['custom'],  // Add required tags field
+        popularity: 0,  // Add required popularity field
+        coingeckoId: undefined,
+        isNative: false,
+        isCustom: true,
+        isVerified: false,
         priceUsd: t.priceUsd,
-      }));
+      } as Token));
     return [...listed, ...custom];
   }, [inputChain.id, customTokens]);
 
@@ -635,17 +641,20 @@ export function SwapWidgetCore() {
     const custom = customTokens
       .filter(t => t.chainId === String(outputChain.id))
       .map(t => ({
-        id: t.address,
+        chainId: String(outputChain.id),
+        address: t.address,
         symbol: t.symbol,
         name: t.name,
         decimals: t.decimals,
-        address: t.address,
-        chainId: String(outputChain.id),
-        logoUrl: '/tokens/unknown.png',
-        isCustom: true as const,
-        isVerified: false as const,
+        logoURI: t.logoUrl || null,  // Convert logoUrl to logoURI and ensure it's null, not undefined
+        tags: ['custom'],  // Add required tags field
+        popularity: 0,  // Add required popularity field
+        coingeckoId: undefined,
+        isNative: false,
+        isCustom: true,
+        isVerified: false,
         priceUsd: t.priceUsd,
-      }));
+      } as Token));
     return [...listed, ...custom];
   }, [outputChain.id, customTokens]);
 
@@ -698,23 +707,26 @@ export function SwapWidgetCore() {
     localStorage.setItem('omniswap_custom_tokens', JSON.stringify(newCustomTokens));
     
     // Select the imported token
-    const tokenForSelection = {
-      id: token.address,
+    const tokenForSelection: Token = {
+      chainId: token.chainId,
+      address: token.address,
       symbol: token.symbol,
       name: token.name,
       decimals: token.decimals,
-      address: token.address,
-      chainId: token.chainId,
-      logoUrl: '/tokens/unknown.png',
-      isCustom: true as const,
-      isVerified: false as const,
+      logoURI: token.logoUrl || null,  // Convert logoUrl to logoURI
+      tags: ['custom'],  // Add required tags
+      popularity: 0,  // Add required popularity
+      coingeckoId: undefined,
+      isNative: false,
+      isCustom: true,
+      isVerified: false,
       priceUsd: token.priceUsd,
     };
     
     if (customTokenModalType === 'input') {
-      setInputToken(tokenForSelection as any);
+      setInputToken(tokenForSelection);
     } else {
-      setOutputToken(tokenForSelection as any);
+      setOutputToken(tokenForSelection);
     }
   }, [customTokens, customTokenModalType]);
 
@@ -796,19 +808,26 @@ export function SwapWidgetCore() {
         t => t.address.toLowerCase() === inputToken.address?.toLowerCase() && t.chainId === String(inputChain.id)
       );
       if (customToken?.priceUsd) {
-        setInputPrice({ priceUsd: customToken.priceUsd, source: 'dexscreener' });
+        setInputPrice({ 
+          priceUsd: customToken.priceUsd, 
+          source: 'dexscreener',
+          timestamp: Date.now() // Add this line
+        });
       } else {
         // Try to fetch price for custom token
         fetch(`https://api.dexscreener.com/latest/dex/tokens/${inputToken.address}`)
           .then(res => res.json())
           .then(data => {
-            if (data.pairs?.[0]?.priceUsd) {
-              setInputPrice({ priceUsd: parseFloat(data.pairs[0].priceUsd), source: 'dexscreener' });
-            } else {
-              setInputPrice(null);
+            if (data.pairs && data.pairs.length > 0) {
+              const pair = data.pairs[0];
+              setInputPrice({
+                priceUsd: parseFloat(pair.priceUsd),
+                source: 'dexscreener',
+                timestamp: Date.now() // Add this here too
+              });
             }
           })
-          .catch(() => setInputPrice(null));
+          .catch(err => console.error('Error fetching price:', err));
       }
       return;
     }
@@ -825,14 +844,23 @@ export function SwapWidgetCore() {
         t => t.address.toLowerCase() === outputToken.address?.toLowerCase() && t.chainId === String(outputChain.id)
       );
       if (customToken?.priceUsd) {
-        setOutputPrice({ priceUsd: customToken.priceUsd, source: 'dexscreener' });
+        setOutputPrice({ 
+          priceUsd: customToken.priceUsd, 
+          source: 'dexscreener',
+          timestamp: Date.now()  // ADD THIS LINE
+        });
       } else {
         // Try to fetch price for custom token
         fetch(`https://api.dexscreener.com/latest/dex/tokens/${outputToken.address}`)
           .then(res => res.json())
           .then(data => {
-            if (data.pairs?.[0]?.priceUsd) {
-              setOutputPrice({ priceUsd: parseFloat(data.pairs[0].priceUsd), source: 'dexscreener' });
+            if (data.pairs && data.pairs.length > 0) {
+              const pair = data.pairs[0];
+              setOutputPrice({
+                priceUsd: parseFloat(pair.priceUsd),
+                source: 'dexscreener',
+                timestamp: Date.now()  // ADD THIS LINE
+              });
             } else {
               setOutputPrice(null);
             }
