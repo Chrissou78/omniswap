@@ -2,11 +2,6 @@
   "version": 2,
   "buildCommand": "pnpm --filter @omniswap/web build",
   "installCommand": "pnpm install --frozen-lockfile",
-  "env": {
-    "NEXT_PUBLIC_PAYMENT_WALLET_EVM": "@next_public_payment_wallet_evm",
-    "NEXT_PUBLIC_PAYMENT_WALLET_SOLANA": "@next_public_payment_wallet_solana",
-    "NEXT_PUBLIC_PAYMENT_WALLET_SUI": "@next_public_payment_wallet_sui"
-  },
   "builds": [
     {
       "src": "apps/web/package.json",
