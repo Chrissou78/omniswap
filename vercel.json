@@ -13,6 +13,5 @@
       "src": "/(.*)",
       "dest": "apps/web/$1"
     }
-  ],
-  "ignoreCommand": "git diff --quiet HEAD~1 HEAD -- apps/web/ packages/shared/ packages/types/ pnpm-lock.yaml"
+  ]
 }
