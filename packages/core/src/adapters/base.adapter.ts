@@ -15,6 +15,9 @@ export interface AdapterQuoteParams {
   inputAmount: string;
   slippage: number;
   userAddress?: string;
+  // Add explicit chain IDs for convenience
+  fromChainId?: string;
+  toChainId?: string;
 }
 
 export interface AdapterQuoteResult {
@@ -25,7 +28,6 @@ export interface AdapterQuoteResult {
   estimatedGasUsd?: number;
   estimatedTime: number;
   priceImpact: number;
-  
   // For execution
   txData?: string;
   txTo?: string;
@@ -42,9 +44,9 @@ export abstract class BaseAdapter {
   abstract readonly name: string;
   abstract readonly type: 'DEX' | 'BRIDGE' | 'CEX';
   abstract readonly supportedChains: string[];
-  
+
   protected config: AdapterConfig;
-  
+
   constructor(config: AdapterConfig) {
     this.config = {
       timeout: 10000,
@@ -52,56 +54,26 @@ export abstract class BaseAdapter {
     };
   }
 
-  /**
-   * Check if this adapter supports the given chain
-   */
   supportsChain(chainId: string): boolean {
     return this.supportedChains.includes(chainId);
   }
 
-  /**
-   * Check if this adapter can handle the given swap
-   */
   abstract canHandle(params: AdapterQuoteParams): boolean;
-
-  /**
-   * Get a quote for the given swap
-   */
   abstract getQuote(params: AdapterQuoteParams): Promise<AdapterQuoteResult | null>;
-
-  /**
-   * Build transaction data for execution
-   */
   abstract buildTransaction(
     params: AdapterQuoteParams,
     quote: AdapterQuoteResult
-  ): Promise<{
-    to: string;
-    data: string;
-    value: string;
-    gasLimit?: string;
-  }>;
+  ): Promise<{ to: string; data: string; value: string; gasLimit?: string }>;
 
-  /**
-   * Fetch with timeout and error handling
-   */
-  protected async fetchWithTimeout(
-    url: string,
-    options: RequestInit = {}
-  ): Promise<Response> {
+  protected async fetchWithTimeout(url: string, options: RequestInit = {}): Promise<Response> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
-
     try {
       const response = await fetch(url, {
         ...options,
         signal: controller.signal,
-        headers: {
-          'Content-Type': 'application/json',
-          ...options.headers,
-        },
+        headers: { 'Content-Type': 'application/json', ...options.headers },
       });
-      
       clearTimeout(timeoutId);
       return response;
     } catch (error: any) {
@@ -113,17 +85,12 @@ export abstract class BaseAdapter {
     }
   }
 
-  /**
-   * Safe JSON fetch
-   */
   protected async fetchJson<T>(url: string, options: RequestInit = {}): Promise<T> {
     const response = await this.fetchWithTimeout(url, options);
-    
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(`${this.name} API error (${response.status}): ${errorText}`);
     }
-    
     return response.json();
   }
 }

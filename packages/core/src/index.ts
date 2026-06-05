@@ -1,18 +1,15 @@
 // packages/core/src/index.ts
-// Main entry point
+// Main entry point for @omniswap/core
 
 // Adapters
 export * from './adapters';
 
-// Services
-export { QuoteService } from './services/quote.service';
-export { TokenService } from './services/token.service';
-export { PriceService } from './services/price.service';
-export { GasService } from './services/gas.service';
+// Executors
+export * from './executors';
 
 // Utils
 export * from './utils/amount-utils';
 export * from './utils/chain-utils';
-
-export { RedisClient, getRedis } from './utils/redis'; 
-export type { RedisConfig } from './utils/redis'; 
+export { logger } from './utils/logger';
+export { RedisClient, getRedis } from './utils/redis';
+export type { RedisConfig } from './utils/redis';

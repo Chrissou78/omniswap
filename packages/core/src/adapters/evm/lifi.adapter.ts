@@ -1,41 +1,15 @@
 import axios, { AxiosInstance } from 'axios';
-import { logger } from '../utils/logger';
+import { logger } from '../../utils/logger';
+import { BaseAdapter, AdapterQuoteParams, AdapterQuoteResult, AdapterConfig } from '../base.adapter';
 
-export interface LiFiRouteRequest {
-  fromChainId: number;
-  fromTokenAddress: string;
-  toChainId: number;
-  toTokenAddress: string;
-  fromAmount: string;
-  slippage: number;
-  fromAddress?: string;
-  toAddress?: string;
-  order?: 'RECOMMENDED' | 'FASTEST' | 'CHEAPEST' | 'SAFEST';
-  allowBridges?: string[];
-  denyBridges?: string[];
-  allowExchanges?: string[];
-  denyExchanges?: string[];
+export interface LiFiConfig extends AdapterConfig {
+  apiKey?: string;
 }
 
-export interface LiFiRoute {
-  id: string;
-  fromChainId: number;
-  fromToken: LiFiToken;
-  fromAmount: string;
-  fromAmountUSD: string;
-  toChainId: number;
-  toToken: LiFiToken;
-  toAmount: string;
-  toAmountMin: string;
-  toAmountUSD: string;
-  gasCostUSD: string;
-  steps: LiFiStep[];
-  tags: string[];
-  insurance?: {
-    state: string;
-    feeAmountUSD: string;
-  };
-}
+const DEFAULT_CONFIG: LiFiConfig = {
+  baseUrl: 'https://li.quest/v1',
+  timeout: 60000,
+};
 
 export interface LiFiToken {
   address: string;
@@ -43,19 +17,15 @@ export interface LiFiToken {
   name: string;
   decimals: number;
   chainId: number;
-  logoURI: string;
-  priceUSD: string;
+  logoURI?: string;
+  priceUSD?: string;
 }
 
 export interface LiFiStep {
   id: string;
   type: 'swap' | 'cross' | 'lifi';
   tool: string;
-  toolDetails: {
-    key: string;
-    name: string;
-    logoURI: string;
-  };
+  toolDetails: { key: string; name: string; logoURI?: string };
   action: {
     fromChainId: number;
     fromToken: LiFiToken;
@@ -73,191 +43,102 @@ export interface LiFiStep {
     feeCosts: any[];
     gasCosts: any[];
   };
-  transactionRequest?: {
-    from: string;
-    to: string;
-    data: string;
-    value: string;
-    gasLimit: string;
-    gasPrice: string;
-    chainId: number;
-  };
 }
 
-export interface LiFiQuoteRequest {
-  fromChain: number;
-  toChain: number;
-  fromToken: string;
-  toToken: string;
+export interface LiFiRoute {
+  id: string;
+  fromChainId: number;
+  fromToken: LiFiToken;
   fromAmount: string;
-  fromAddress: string;
-  toAddress?: string;
-  slippage?: number;
-  order?: string;
-  integrator?: string;
+  fromAmountUSD: string;
+  toChainId: number;
+  toToken: LiFiToken;
+  toAmount: string;
+  toAmountMin: string;
+  toAmountUSD: string;
+  gasCostUSD: string;
+  steps: LiFiStep[];
+  tags: string[];
 }
 
-export class LiFiAdapter {
-  private client: AxiosInstance;
-  private apiKey?: string;
+export class LiFiAdapter extends BaseAdapter {
+  readonly name = 'lifi';
+  readonly type = 'BRIDGE' as const;
+  readonly supportedChains = ['1', '56', '137', '42161', '10', '8453', '43114', '250', '324', '59144', '534352'];
 
-  constructor(apiKey?: string) {
-    this.apiKey = apiKey;
+  private client: AxiosInstance;
+
+  constructor(config: Partial<LiFiConfig> = {}) {
+    const mergedConfig = { ...DEFAULT_CONFIG, ...config };
+    super(mergedConfig);
+
     this.client = axios.create({
-      baseURL: 'https://li.quest/v1',
+      baseURL: mergedConfig.baseUrl,
       headers: {
         'Content-Type': 'application/json',
-        ...(apiKey ? { 'x-lifi-api-key': apiKey } : {}),
+        ...(mergedConfig.apiKey ? { 'x-lifi-api-key': mergedConfig.apiKey } : {}),
       },
-      timeout: 60000, // Cross-chain can be slow
+      timeout: mergedConfig.timeout || 60000,
     });
   }
 
-  async getRoutes(request: LiFiRouteRequest): Promise<LiFiRoute[]> {
-    try {
-      const response = await this.client.post('/advanced/routes', {
-        fromChainId: request.fromChainId,
-        fromTokenAddress: request.fromTokenAddress,
-        toChainId: request.toChainId,
-        toTokenAddress: request.toTokenAddress,
-        fromAmount: request.fromAmount,
-        options: {
-          slippage: request.slippage,
-          order: request.order || 'RECOMMENDED',
-          allowBridges: request.allowBridges,
-          denyBridges: request.denyBridges,
-          allowExchanges: request.allowExchanges,
-          denyExchanges: request.denyExchanges,
-          integrator: 'omniswap',
-        },
-        ...(request.fromAddress && { fromAddress: request.fromAddress }),
-        ...(request.toAddress && { toAddress: request.toAddress }),
-      });
-
-      return response.data.routes || [];
-    } catch (error: any) {
-      logger.error('Li.Fi routes error', {
-        fromChainId: request.fromChainId,
-        toChainId: request.toChainId,
-        error: error.response?.data || error.message,
-      });
-      return [];
-    }
+  canHandle(params: AdapterQuoteParams): boolean {
+    const fromChainId = params.fromChainId || params.inputToken.chainId;
+    const toChainId = params.toChainId || params.outputToken.chainId;
+    return this.supportsChain(fromChainId) && this.supportsChain(toChainId);
   }
 
-  async getQuote(request: LiFiQuoteRequest): Promise<LiFiRoute | null> {
+  async getQuote(params: AdapterQuoteParams): Promise<AdapterQuoteResult | null> {
+    const fromChainId = params.fromChainId || params.inputToken.chainId;
+    const toChainId = params.toChainId || params.outputToken.chainId;
+
     try {
       const response = await this.client.get('/quote', {
         params: {
-          fromChain: request.fromChain,
-          toChain: request.toChain,
-          fromToken: request.fromToken,
-          toToken: request.toToken,
-          fromAmount: request.fromAmount,
-          fromAddress: request.fromAddress,
-          toAddress: request.toAddress || request.fromAddress,
-          slippage: request.slippage || 0.03,
-          integrator: request.integrator || 'omniswap',
+          fromChain: fromChainId,
+          toChain: toChainId,
+          fromToken: params.inputToken.address,
+          toToken: params.outputToken.address,
+          fromAmount: params.inputAmount,
+          fromAddress: params.userAddress || '0x0000000000000000000000000000000000000000',
+          slippage: params.slippage / 100 || 0.03,
+          integrator: 'omniswap',
         },
       });
 
-      return response.data;
+      const route: LiFiRoute = response.data;
+      if (!route) return null;
+
+      const totalTime = route.steps.reduce((acc, step) => acc + (step.estimate.executionDuration || 0), 0);
+
+      return {
+        outputAmount: route.toAmount,
+        minimumOutput: route.toAmountMin,
+        estimatedGas: route.gasCostUSD,
+        estimatedTime: totalTime || 300,
+        priceImpact: 0,
+        route: route.steps.map((step) => ({
+          type: step.type === 'cross' ? 'BRIDGE' : 'SWAP',
+          protocol: step.toolDetails?.name || step.tool,
+          chainId: step.action.fromChainId.toString(),
+          inputToken: params.inputToken,
+          outputToken: params.outputToken,
+          inputAmount: step.action.fromAmount,
+          expectedOutput: step.estimate.toAmount,
+          minimumOutput: step.estimate.toAmountMin,
+          estimatedTime: step.estimate.executionDuration || 60,
+        })),
+      };
     } catch (error: any) {
-      logger.error('Li.Fi quote error', {
-        fromChain: request.fromChain,
-        toChain: request.toChain,
-        error: error.response?.data || error.message,
-      });
+      logger.error('Li.Fi quote error', { fromChainId, toChainId, error: error.response?.data || error.message });
       return null;
     }
   }
 
-  async getStepTransaction(step: LiFiStep): Promise<LiFiStep | null> {
-    try {
-      const response = await this.client.post('/advanced/stepTransaction', {
-        step,
-      });
-
-      return response.data;
-    } catch (error: any) {
-      logger.error('Li.Fi step transaction error', {
-        stepId: step.id,
-        error: error.response?.data || error.message,
-      });
-      return null;
-    }
-  }
-
-  async getStatus(
-    bridge: string,
-    fromChain: number,
-    toChain: number,
-    txHash: string
-  ): Promise<{
-    status: 'NOT_FOUND' | 'PENDING' | 'DONE' | 'FAILED';
-    substatus?: string;
-    receiving?: {
-      txHash: string;
-      amount: string;
-    };
-  } | null> {
-    try {
-      const response = await this.client.get('/status', {
-        params: {
-          bridge,
-          fromChain,
-          toChain,
-          txHash,
-        },
-      });
-
-      return response.data;
-    } catch (error: any) {
-      logger.error('Li.Fi status error', { txHash, error: error.message });
-      return null;
-    }
-  }
-
-  async getChains(): Promise<any[]> {
-    try {
-      const response = await this.client.get('/chains');
-      return response.data.chains || [];
-    } catch (error) {
-      logger.error('Li.Fi chains error', { error });
-      return [];
-    }
-  }
-
-  async getTokens(chainId?: number): Promise<any> {
-    try {
-      const params = chainId ? { chains: chainId.toString() } : {};
-      const response = await this.client.get('/tokens', { params });
-      return response.data.tokens || {};
-    } catch (error) {
-      logger.error('Li.Fi tokens error', { error });
-      return {};
-    }
-  }
-
-  async getConnections(
-    fromChain: number,
-    toChain: number,
-    fromToken?: string,
-    toToken?: string
-  ): Promise<any> {
-    try {
-      const response = await this.client.get('/connections', {
-        params: {
-          fromChain,
-          toChain,
-          fromToken,
-          toToken,
-        },
-      });
-      return response.data;
-    } catch (error) {
-      logger.error('Li.Fi connections error', { error });
-      return null;
-    }
+  async buildTransaction(
+    params: AdapterQuoteParams,
+    quote: AdapterQuoteResult
+  ): Promise<{ to: string; data: string; value: string; gasLimit?: string }> {
+    throw new Error('LiFi buildTransaction requires step data from quote');
   }
 }

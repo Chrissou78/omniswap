@@ -6,7 +6,6 @@ export interface RangoConfig extends AdapterConfig {
   apiKey?: string;
 }
 
-// Chain ID to Rango blockchain name mapping
 const CHAIN_TO_BLOCKCHAIN: Record<string, string> = {
   '1': 'ETH',
   '56': 'BSC',
@@ -28,106 +27,94 @@ const CHAIN_TO_BLOCKCHAIN: Record<string, string> = {
 const BLOCKCHAIN_TO_CHAIN: Record<string, string> = Object.entries(CHAIN_TO_BLOCKCHAIN)
   .reduce((acc, [k, v]) => ({ ...acc, [v]: k }), {});
 
+const DEFAULT_CONFIG: RangoConfig = {
+  baseUrl: 'https://api.rango.exchange',
+  timeout: 45000,
+};
+
 export class RangoAdapter extends BaseAdapter {
   readonly name = 'rango';
   readonly type = 'BRIDGE' as const;
   readonly supportedChains = Object.keys(CHAIN_TO_BLOCKCHAIN);
-  
+
   private readonly client: AxiosInstance;
 
-  constructor(config: RangoConfig = {}) {
-    super(config);
-    
+  constructor(config: Partial<RangoConfig> = {}) {
+    const mergedConfig = { ...DEFAULT_CONFIG, ...config };
+    super(mergedConfig);
+
     this.client = axios.create({
-      baseURL: 'https://api.rango.exchange',
-      timeout: this.config.timeout || 45000,
+      baseURL: mergedConfig.baseUrl,
+      timeout: mergedConfig.timeout || 45000,
       headers: {
         'Content-Type': 'application/json',
-        ...(config.apiKey && { 'API-KEY': config.apiKey }),
+        ...(mergedConfig.apiKey && { 'API-KEY': mergedConfig.apiKey }),
       },
     });
   }
 
   canHandle(params: AdapterQuoteParams): boolean {
-    const fromSupported = this.supportsChain(params.fromChainId);
-    const toSupported = this.supportsChain(params.toChainId);
-    // Rango handles both same-chain and cross-chain
-    return fromSupported && toSupported;
+    const fromChainId = params.fromChainId || params.inputToken.chainId;
+    const toChainId = params.toChainId || params.outputToken.chainId;
+    return this.supportsChain(fromChainId) && this.supportsChain(toChainId);
   }
 
-  private formatToken(
-    chainId: string,
-    address: string,
-    symbol: string
-  ): string {
+  private formatToken(chainId: string, address: string, symbol: string): string {
     const blockchain = CHAIN_TO_BLOCKCHAIN[chainId];
     if (!blockchain) return '';
-    
-    const isNative = !address || 
+
+    const isNative = !address ||
       address === '0x0000000000000000000000000000000000000000' ||
       address === '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
-    
-    if (isNative) {
-      return `${blockchain}.${symbol}`;
-    }
-    return `${blockchain}.${symbol}--${address}`;
+
+    return isNative ? `${blockchain}.${symbol}` : `${blockchain}.${symbol}--${address}`;
   }
 
   async getQuote(params: AdapterQuoteParams): Promise<AdapterQuoteResult | null> {
     try {
-      const fromBlockchain = CHAIN_TO_BLOCKCHAIN[params.fromChainId];
-      const toBlockchain = CHAIN_TO_BLOCKCHAIN[params.toChainId];
-      
-      if (!fromBlockchain || !toBlockchain) {
-        return null;
-      }
+      const fromChainId = params.fromChainId || params.inputToken.chainId;
+      const toChainId = params.toChainId || params.outputToken.chainId;
+      const fromBlockchain = CHAIN_TO_BLOCKCHAIN[fromChainId];
+      const toBlockchain = CHAIN_TO_BLOCKCHAIN[toChainId];
 
-      const queryParams: any = {
-        from: this.formatToken(params.fromChainId, params.fromTokenAddress, params.fromTokenSymbol || 'TOKEN'),
-        to: this.formatToken(params.toChainId, params.toTokenAddress, params.toTokenSymbol || 'TOKEN'),
-        amount: params.amount,
+      if (!fromBlockchain || !toBlockchain) return null;
+
+      const queryParams: Record<string, string> = {
+        from: this.formatToken(fromChainId, params.inputToken.address, params.inputToken.symbol),
+        to: this.formatToken(toChainId, params.outputToken.address, params.outputToken.symbol),
+        amount: params.inputAmount,
         slippage: (params.slippage || 1).toString(),
-        enableCentralizedSwappers: true,
+        enableCentralizedSwappers: 'true',
       };
 
       if (params.userAddress) {
         queryParams.fromAddress = params.userAddress;
-        queryParams.toAddress = params.recipient || params.userAddress;
+        queryParams.toAddress = params.userAddress;
       }
 
       const response = await this.client.get('/routing/best', { params: queryParams });
 
-      if (response.data.resultType !== 'OK' || !response.data.route) {
-        return null;
-      }
+      if (response.data.resultType !== 'OK' || !response.data.route) return null;
 
       const route = response.data.route;
-      
-      const steps = route.path?.map((step: any) => ({
-        type: step.swapperType === 'BRIDGE' ? 'bridge' : 'swap',
-        protocol: step.swapper?.title || step.swapper?.id || 'Rango',
-        fromToken: step.from?.symbol,
-        toToken: step.to?.symbol,
-        fromChainId: BLOCKCHAIN_TO_CHAIN[step.from?.blockchain] || params.fromChainId,
-        toChainId: BLOCKCHAIN_TO_CHAIN[step.to?.blockchain] || params.toChainId,
-      })) || [];
 
       return {
         outputAmount: route.outputAmount,
-        outputAmountMin: route.outputAmountMin || route.outputAmount,
+        minimumOutput: route.outputAmountMin || route.outputAmount,
         estimatedGas: route.feeUsd?.toString() || '0',
+        estimatedTime: route.estimatedTimeInSeconds || 300,
         priceImpact: 0,
-        route: {
-          steps,
-          estimatedTimeSeconds: route.estimatedTimeInSeconds || 300,
-        },
-        metadata: {
-          requestId: response.data.requestId,
-          swapper: route.swapper?.title,
-          outputAmountUsd: route.outputAmountUsd,
-          feeUsd: route.feeUsd,
-          rawRoute: response.data,
-        },
+        route: route.path?.map((step: any) => ({
+          type: step.swapperType === 'BRIDGE' ? 'BRIDGE' : 'SWAP',
+          protocol: step.swapper?.title || step.swapper?.id || 'Rango',
+          chainId: BLOCKCHAIN_TO_CHAIN[step.from?.blockchain] || fromChainId,
+          inputToken: params.inputToken,
+          outputToken: params.outputToken,
+          inputAmount: params.inputAmount,
+          expectedOutput: route.outputAmount,
+          minimumOutput: route.outputAmountMin || route.outputAmount,
+          estimatedTime: route.estimatedTimeInSeconds || 300,
+        })) || [],
       };
     } catch (error: any) {
       console.error('[Rango] Quote error:', error.message);
@@ -139,60 +126,6 @@ export class RangoAdapter extends BaseAdapter {
     params: AdapterQuoteParams,
     quote: AdapterQuoteResult
   ): Promise<{ to: string; data: string; value: string; gasLimit?: string }> {
-    try {
-      const requestId = quote.metadata?.requestId;
-      if (!requestId) {
-        throw new Error('No request ID in quote');
-      }
-
-      const response = await this.client.post('/tx/create', {
-        requestId,
-        step: 1,
-        userSettings: {
-          slippage: (params.slippage || 1).toString(),
-          infiniteApprove: false,
-        },
-        validations: {
-          balance: true,
-          fee: true,
-          approve: true,
-        },
-      });
-
-      if (response.data.resultType !== 'OK' || !response.data.tx) {
-        throw new Error(response.data.error || 'Failed to create transaction');
-      }
-
-      const tx = response.data.tx;
-
-      return {
-        to: tx.to || tx.txTo,
-        data: tx.data || tx.txData,
-        value: tx.value || '0',
-        gasLimit: tx.gasLimit,
-      };
-    } catch (error: any) {
-      console.error('[Rango] Build transaction error:', error.message);
-      throw error;
-    }
-  }
-
-  async getStatus(
-    requestId: string,
-    txHash: string,
-    step: number = 1
-  ): Promise<{ status: string; output?: any } | null> {
-    try {
-      const response = await this.client.get('/tx/check-status', {
-        params: { requestId, txId: txHash, step },
-      });
-
-      return {
-        status: response.data.status || 'PENDING',
-        output: response.data.output,
-      };
-    } catch (error) {
-      return null;
-    }
+    throw new Error('Rango buildTransaction requires requestId from quote metadata');
   }
 }

@@ -24,8 +24,9 @@ export async function PUT(
         position: data.position,
         width: data.width,
         height: data.height,
-        pricePerDayUsd: data.pricePerDayUsd,
+        basePrice: data.basePrice ?? data.pricePerDayUsd,
         description: data.description,
+        dimensions: data.dimensions,
       },
     });
 

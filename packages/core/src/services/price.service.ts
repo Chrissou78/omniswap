@@ -7,7 +7,7 @@ export interface TokenInfo {
   symbol: string;
   name: string;
   decimals: number;
-  logoURI?: string;
+  logoUrl?: string;
   chainId: number;
 }
 
@@ -243,7 +243,7 @@ export class PriceService {
         symbol: data.symbol?.toUpperCase() || '',
         name: data.name || '',
         decimals: data.detail_platforms?.[platform]?.decimal_place || 18,
-        logoURI: data.image?.small,
+        logoUrl: data.image?.small,
         chainId,
       };
     } catch {
@@ -281,7 +281,7 @@ export class PriceService {
         symbol: data.symbol || '',
         name: data.name || '',
         decimals: data.decimals || 9,
-        logoURI: data.logoURI,
+        logoUrl: data.logoURI,
         chainId: 101,
       };
     } catch {
@@ -328,7 +328,7 @@ export class PriceService {
         symbol: token.symbol || '',
         name: token.name || '',
         decimals: token.decimals || 9,
-        logoURI: token.logoURI,
+        logoUrl: token.logoURI,
         chainId: 784,
       };
     } catch {

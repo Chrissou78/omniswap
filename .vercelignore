@@ -1,0 +1,15 @@
+.github
+.git
+.gitignore
+*.md
+docker
+docker-compose*
+Dockerfile
+k8s
+fastlane
+eas.json
+.dockerignore
+apps/mobile
+apps/api
+apps/admin
+packages/contracts

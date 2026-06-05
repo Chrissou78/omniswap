@@ -25,11 +25,14 @@
     "lint": "eslint src --ext .ts"
   },
   "dependencies": {
+    "@mysten/sui.js": "^0.54.1",
+    "@omniswap/types": "workspace:^",
+    "@prisma/client": "^5.22.0",
     "axios": "^1.6.0",
+    "bullmq": "^5.67.2",
     "crypto-js": "^4.2.0",
     "ethers": "^6.9.0",
-    "ioredis": "^5.3.0",
-    "@prisma/client": "^5.22.0"
+    "ioredis": "^5.3.0"
   },
   "devDependencies": {
     "@types/crypto-js": "^4.2.2",

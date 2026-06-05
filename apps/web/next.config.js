@@ -1,11 +1,8 @@
-const path = require('path');
-require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
   
-  // Make env vars available
+  // Make env vars available (only reference Vercel-injected vars)
   env: {
     NEXT_PUBLIC_PAYMENT_WALLET_EVM: process.env.NEXT_PUBLIC_PAYMENT_WALLET_EVM,
     NEXT_PUBLIC_PAYMENT_WALLET_SOLANA: process.env.NEXT_PUBLIC_PAYMENT_WALLET_SOLANA,

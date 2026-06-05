@@ -1,4 +1,4 @@
-import { PrismaClient, LimitOrder, LimitOrderStatus, LimitOrderType, Prisma } from '@prisma/client';
+import { PrismaClient, LimitOrder, OrderStatus, OrderType, Prisma } from '@prisma/client';
 import { Redis } from 'ioredis';
 import { Queue } from 'bullmq';
 import { logger } from '../utils/logger';
@@ -14,26 +14,26 @@ export interface CreateLimitOrderInput {
   userId: string;
   tenantId?: string;
   orderType: 'buy' | 'sell';
-  inputTokenAddress: string;
-  inputTokenSymbol: string;
+  fromTokenAddress: string;
+  fromTokenSymbol: string;
   inputTokenDecimals: number;
   inputTokenLogoURI?: string;
-  inputChainId: number;
+  fromChainId: number;
   inputAmount: string;
-  outputTokenAddress: string;
-  outputTokenSymbol: string;
+  toTokenAddress: string;
+  toTokenSymbol: string;
   outputTokenDecimals: number;
   outputTokenLogoURI?: string;
-  outputChainId: number;
+  toChainId: number;
   targetPrice: string;
-  slippageBps?: number;
+  slippage?: number;
   expiresIn?: number; // milliseconds
   partialFillAllowed?: boolean;
 }
 
 export interface UpdateLimitOrderInput {
   targetPrice?: string;
-  slippageBps?: number;
+  slippage?: number;
   expiresAt?: Date;
   partialFillAllowed?: boolean;
 }
@@ -53,8 +53,8 @@ export interface LimitOrderStats {
 }
 
 export interface LimitOrderFilters {
-  status?: LimitOrderStatus[];
-  orderType?: LimitOrderType;
+  status?: OrderStatus[];
+  orderType?: OrderType;
   chainId?: number;
   tokenAddress?: string;
 }
@@ -101,29 +101,29 @@ export class LimitOrderService {
       userId,
       tenantId,
       orderType,
-      inputTokenAddress,
-      inputTokenSymbol,
+      fromTokenAddress,
+      fromTokenSymbol,
       inputTokenDecimals,
       inputTokenLogoURI,
-      inputChainId,
+      fromChainId,
       inputAmount,
-      outputTokenAddress,
-      outputTokenSymbol,
+      toTokenAddress,
+      toTokenSymbol,
       outputTokenDecimals,
       outputTokenLogoURI,
-      outputChainId,
+      toChainId,
       targetPrice,
-      slippageBps = this.DEFAULT_SLIPPAGE_BPS,
+      slippage = this.DEFAULT_SLIPPAGE_BPS,
       expiresIn,
       partialFillAllowed = false,
     } = input;
 
     // Get current market price
     const currentPrice = await this.getCurrentPrice(
-      inputChainId,
-      inputTokenAddress,
-      outputChainId,
-      outputTokenAddress
+      fromChainId,
+      fromTokenAddress,
+      toChainId,
+      toTokenAddress
     );
 
     if (!currentPrice) {
@@ -147,7 +147,7 @@ export class LimitOrderService {
     const estimatedOutput = inputAmountNum / targetPriceNum;
 
     // Get tenant fee config or use default
-    let platformFeeBps = this.DEFAULT_PLATFORM_FEE_BPS;
+    let platformFeeUsd = this.DEFAULT_PLATFORM_FEE_BPS;
     if (tenantId) {
       const tenant = await this.prisma.tenant.findUnique({
         where: { id: tenantId },
@@ -155,7 +155,7 @@ export class LimitOrderService {
       });
       if (tenant?.feeConfig) {
         const feeConfig = tenant.feeConfig as { limitOrderFeeBps?: number };
-        platformFeeBps = feeConfig.limitOrderFeeBps ?? this.DEFAULT_PLATFORM_FEE_BPS;
+        platformFeeUsd = feeConfig.limitOrderFeeBps ?? this.DEFAULT_PLATFORM_FEE_BPS;
       }
     }
 
@@ -164,27 +164,27 @@ export class LimitOrderService {
       data: {
         userId,
         tenantId,
-        orderType: orderType === 'buy' ? LimitOrderType.BUY : LimitOrderType.SELL,
-        status: LimitOrderStatus.PENDING,
-        inputTokenAddress: inputTokenAddress.toLowerCase(),
-        inputTokenSymbol,
+        orderType: orderType === 'buy' ? OrderType.BUY : OrderType.SELL,
+        status: OrderStatus.PENDING,
+        fromTokenAddress: fromTokenAddress.toLowerCase(),
+        fromTokenSymbol,
         inputTokenDecimals,
         inputTokenLogoURI,
-        inputChainId,
+        fromChainId,
         inputAmount: new Prisma.Decimal(inputAmount),
-        outputTokenAddress: outputTokenAddress.toLowerCase(),
-        outputTokenSymbol,
+        toTokenAddress: toTokenAddress.toLowerCase(),
+        toTokenSymbol,
         outputTokenDecimals,
         outputTokenLogoURI,
-        outputChainId,
+        toChainId,
         outputAmount: new Prisma.Decimal(estimatedOutput),
         targetPrice: new Prisma.Decimal(targetPrice),
         currentPrice: new Prisma.Decimal(currentPrice),
-        priceAtCreation: new Prisma.Decimal(currentPrice),
-        slippageBps,
+        basePrice: new Prisma.Decimal(currentPrice),
+        slippage,
         expiresAt,
         partialFillAllowed,
-        platformFeeBps,
+        platformFeeUsd,
       },
     });
 
@@ -202,8 +202,8 @@ export class LimitOrderService {
       orderId: order.id,
       userId,
       orderType,
-      inputTokenSymbol,
-      outputTokenSymbol,
+      fromTokenSymbol,
+      toTokenSymbol,
       targetPrice,
     });
 
@@ -220,7 +220,7 @@ export class LimitOrderService {
       where: {
         id: orderId,
         userId,
-        status: LimitOrderStatus.PENDING,
+        status: OrderStatus.PENDING,
       },
     });
 
@@ -233,8 +233,8 @@ export class LimitOrderService {
     if (input.targetPrice !== undefined) {
       updateData.targetPrice = new Prisma.Decimal(input.targetPrice);
     }
-    if (input.slippageBps !== undefined) {
-      updateData.slippageBps = input.slippageBps;
+    if (input.slippage !== undefined) {
+      updateData.slippage = input.slippage;
     }
     if (input.expiresAt !== undefined) {
       updateData.expiresAt = input.expiresAt;
@@ -258,7 +258,7 @@ export class LimitOrderService {
       where: {
         id: orderId,
         userId,
-        status: { in: [LimitOrderStatus.PENDING, LimitOrderStatus.PARTIALLY_FILLED] },
+        status: { in: [OrderStatus.PENDING, OrderStatus.PARTIALLY_FILLED] },
       },
     });
 
@@ -269,7 +269,7 @@ export class LimitOrderService {
     const order = await this.prisma.limitOrder.update({
       where: { id: orderId },
       data: {
-        status: LimitOrderStatus.CANCELLED,
+        status: OrderStatus.CANCELLED,
         cancelledAt: new Date(),
       },
     });
@@ -308,15 +308,15 @@ export class LimitOrderService {
     }
     if (filters?.chainId) {
       where.OR = [
-        { inputChainId: filters.chainId },
-        { outputChainId: filters.chainId },
+        { fromChainId: filters.chainId },
+        { toChainId: filters.chainId },
       ];
     }
     if (filters?.tokenAddress) {
       const addr = filters.tokenAddress.toLowerCase();
       where.OR = [
-        { inputTokenAddress: addr },
-        { outputTokenAddress: addr },
+        { fromTokenAddress: addr },
+        { toTokenAddress: addr },
       ];
     }
 
@@ -354,19 +354,19 @@ export class LimitOrderService {
       await Promise.all([
         this.prisma.limitOrder.count({ where: { userId } }),
         this.prisma.limitOrder.count({
-          where: { userId, status: LimitOrderStatus.PENDING },
+          where: { userId, status: OrderStatus.PENDING },
         }),
         this.prisma.limitOrder.count({
-          where: { userId, status: LimitOrderStatus.FILLED },
+          where: { userId, status: OrderStatus.FILLED },
         }),
         this.prisma.limitOrder.count({
-          where: { userId, status: LimitOrderStatus.CANCELLED },
+          where: { userId, status: OrderStatus.CANCELLED },
         }),
         this.prisma.limitOrder.aggregate({
-          where: { userId, status: LimitOrderStatus.FILLED },
+          where: { userId, status: OrderStatus.FILLED },
           _sum: {
             inputAmount: true,
-            platformFeeAmount: true,
+            platformFeeUsd: true,
           },
         }),
       ]);
@@ -377,7 +377,7 @@ export class LimitOrderService {
       filledOrders,
       cancelledOrders,
       totalVolume: Number(volumeAndFees._sum.inputAmount || 0),
-      totalFees: Number(volumeAndFees._sum.platformFeeAmount || 0),
+      totalFees: Number(volumeAndFees._sum.platformFeeUsd || 0),
     };
 
     await this.redis.setex(cacheKey, this.STATS_CACHE_TTL, JSON.stringify(stats));
@@ -399,8 +399,8 @@ export class LimitOrderService {
     }
 
     // Check if order is still valid
-    if (order.status !== LimitOrderStatus.PENDING && 
-        order.status !== LimitOrderStatus.PARTIALLY_FILLED) {
+    if (order.status !== OrderStatus.PENDING && 
+        order.status !== OrderStatus.PARTIALLY_FILLED) {
       return { executed: false, reason: 'Order not active' };
     }
 
@@ -408,7 +408,7 @@ export class LimitOrderService {
     if (order.expiresAt && order.expiresAt < new Date()) {
       await this.prisma.limitOrder.update({
         where: { id: orderId },
-        data: { status: LimitOrderStatus.EXPIRED },
+        data: { status: OrderStatus.EXPIRED },
       });
       await this.invalidateStatsCache(order.userId);
       return { executed: false, reason: 'Order expired' };
@@ -416,10 +416,10 @@ export class LimitOrderService {
 
     // Get current price
     const currentPrice = await this.getCurrentPrice(
-      order.inputChainId,
-      order.inputTokenAddress,
-      order.outputChainId,
-      order.outputTokenAddress
+      order.fromChainId,
+      order.fromTokenAddress,
+      order.toChainId,
+      order.toTokenAddress
     );
 
     if (!currentPrice) {
@@ -435,8 +435,8 @@ export class LimitOrderService {
     // Check if target price is reached
     const targetPrice = Number(order.targetPrice);
     const shouldExecute =
-      (order.orderType === LimitOrderType.BUY && currentPrice <= targetPrice) ||
-      (order.orderType === LimitOrderType.SELL && currentPrice >= targetPrice);
+      (order.orderType === OrderType.BUY && currentPrice <= targetPrice) ||
+      (order.orderType === OrderType.SELL && currentPrice >= targetPrice);
 
     if (shouldExecute) {
       try {
@@ -457,12 +457,12 @@ export class LimitOrderService {
     try {
       // Get quote for the swap
       const quote = await this.quoteService.getQuote({
-        inputChainId: order.inputChainId,
-        inputTokenAddress: order.inputTokenAddress,
-        outputChainId: order.outputChainId,
-        outputTokenAddress: order.outputTokenAddress,
+        fromChainId: order.fromChainId,
+        fromTokenAddress: order.fromTokenAddress,
+        toChainId: order.toChainId,
+        toTokenAddress: order.toTokenAddress,
         inputAmount: order.inputAmount.toString(),
-        slippageBps: order.slippageBps,
+        slippage: order.slippage,
         userId: order.userId,
       });
 
@@ -479,19 +479,19 @@ export class LimitOrderService {
 
       // Calculate fees
       const inputAmountNum = Number(order.inputAmount);
-      const platformFeeAmount = (inputAmountNum * order.platformFeeBps) / 10000;
+      const platformFeeUsd = (inputAmountNum * order.platformFeeUsd) / 10000;
 
       // Update order as filled
       await this.prisma.$transaction([
         this.prisma.limitOrder.update({
           where: { id: order.id },
           data: {
-            status: LimitOrderStatus.FILLED,
+            status: OrderStatus.FILLED,
             executionPrice: new Prisma.Decimal(executionPrice),
             outputAmount: new Prisma.Decimal(result.outputAmount),
             filledAmount: order.inputAmount,
             fillPercent: new Prisma.Decimal(100),
-            platformFeeAmount: new Prisma.Decimal(platformFeeAmount),
+            platformFeeUsd: new Prisma.Decimal(platformFeeUsd),
             gasFeeActual: result.gasFee ? new Prisma.Decimal(result.gasFee) : null,
             txHash: result.txHash,
             blockNumber: result.blockNumber ? BigInt(result.blockNumber) : null,
@@ -524,8 +524,8 @@ export class LimitOrderService {
       await this.prisma.limitOrder.update({
         where: { id: order.id },
         data: {
-          status: LimitOrderStatus.FAILED,
-          errorMessage: (error as Error).message,
+          status: OrderStatus.FAILED,
+          error: (error as Error).message,
         },
       });
 
@@ -537,7 +537,7 @@ export class LimitOrderService {
   async checkAllPendingOrders(): Promise<{ checked: number; executed: number }> {
     const pendingOrders = await this.prisma.limitOrder.findMany({
       where: {
-        status: { in: [LimitOrderStatus.PENDING, LimitOrderStatus.PARTIALLY_FILLED] },
+        status: { in: [OrderStatus.PENDING, OrderStatus.PARTIALLY_FILLED] },
       },
       select: { id: true },
     });
@@ -559,12 +559,12 @@ export class LimitOrderService {
   // --------------------------------------------------------------------------
 
   private async getCurrentPrice(
-    inputChainId: number,
-    inputTokenAddress: string,
-    outputChainId: number,
-    outputTokenAddress: string
+    fromChainId: number,
+    fromTokenAddress: string,
+    toChainId: number,
+    toTokenAddress: string
   ): Promise<number | null> {
-    const cacheKey = `price:pair:${inputChainId}:${inputTokenAddress}:${outputChainId}:${outputTokenAddress}`;
+    const cacheKey = `price:pair:${fromChainId}:${fromTokenAddress}:${toChainId}:${toTokenAddress}`;
     const cached = await this.redis.get(cacheKey);
 
     if (cached) {
@@ -573,8 +573,8 @@ export class LimitOrderService {
 
     try {
       const [inputPrice, outputPrice] = await Promise.all([
-        this.priceService.getTokenPrice(inputChainId, inputTokenAddress),
-        this.priceService.getTokenPrice(outputChainId, outputTokenAddress),
+        this.priceService.getTokenPrice(fromChainId, fromTokenAddress),
+        this.priceService.getTokenPrice(toChainId, toTokenAddress),
       ]);
 
       if (!inputPrice || !outputPrice) return null;
@@ -593,10 +593,10 @@ export class LimitOrderService {
 
   private async enrichOrderWithPrice(order: LimitOrder): Promise<LimitOrderWithCurrentPrice> {
     const currentPrice = await this.getCurrentPrice(
-      order.inputChainId,
-      order.inputTokenAddress,
-      order.outputChainId,
-      order.outputTokenAddress
+      order.fromChainId,
+      order.fromTokenAddress,
+      order.toChainId,
+      order.toTokenAddress
     );
 
     const targetPrice = Number(order.targetPrice);

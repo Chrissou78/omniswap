@@ -1,4 +1,4 @@
-import { Prisma, LimitOrderStatus, LimitOrderType } from '@prisma/client';
+import { Prisma, OrderStatus, OrderType } from '@prisma/client';
 import { LimitOrderService } from '../../services/limit-order.service';
 import { prismaMock, redisMock } from '../setup';
 import {
@@ -63,15 +63,15 @@ describe('LimitOrderService', () => {
       const result = await limitOrderService.createOrder({
         userId: 'user_test123',
         orderType: 'buy',
-        inputTokenAddress: '0xusdc123',
-        inputTokenSymbol: 'USDC',
+        fromTokenAddress: '0xusdc123',
+        fromTokenSymbol: 'USDC',
         inputTokenDecimals: 6,
-        inputChainId: 1,
+        fromChainId: 1,
         inputAmount: '1000',
-        outputTokenAddress: '0xeth123',
-        outputTokenSymbol: 'ETH',
+        toTokenAddress: '0xeth123',
+        toTokenSymbol: 'ETH',
         outputTokenDecimals: 18,
-        outputChainId: 1,
+        toChainId: 1,
         targetPrice: '2000', // Buy when price drops to 2000
       });
 
@@ -79,8 +79,8 @@ describe('LimitOrderService', () => {
       expect(prismaMock.limitOrder.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           userId: 'user_test123',
-          orderType: LimitOrderType.BUY,
-          status: LimitOrderStatus.PENDING,
+          orderType: OrderType.BUY,
+          status: OrderStatus.PENDING,
         }),
       });
       expect(mockQueue.add).toHaveBeenCalled();
@@ -99,21 +99,21 @@ describe('LimitOrderService', () => {
       const result = await limitOrderService.createOrder({
         userId: 'user_test123',
         orderType: 'sell',
-        inputTokenAddress: '0xeth123',
-        inputTokenSymbol: 'ETH',
+        fromTokenAddress: '0xeth123',
+        fromTokenSymbol: 'ETH',
         inputTokenDecimals: 18,
-        inputChainId: 1,
+        fromChainId: 1,
         inputAmount: '1',
-        outputTokenAddress: '0xusdc123',
-        outputTokenSymbol: 'USDC',
+        toTokenAddress: '0xusdc123',
+        toTokenSymbol: 'USDC',
         outputTokenDecimals: 6,
-        outputChainId: 1,
+        toChainId: 1,
         targetPrice: '2500', // Sell when price rises to 2500
       });
 
       expect(prismaMock.limitOrder.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
-          orderType: LimitOrderType.SELL,
+          orderType: OrderType.SELL,
         }),
       });
     });
@@ -123,15 +123,15 @@ describe('LimitOrderService', () => {
         limitOrderService.createOrder({
           userId: 'user_test123',
           orderType: 'buy',
-          inputTokenAddress: '0xusdc123',
-          inputTokenSymbol: 'USDC',
+          fromTokenAddress: '0xusdc123',
+          fromTokenSymbol: 'USDC',
           inputTokenDecimals: 6,
-          inputChainId: 1,
+          fromChainId: 1,
           inputAmount: '1000',
-          outputTokenAddress: '0xeth123',
-          outputTokenSymbol: 'ETH',
+          toTokenAddress: '0xeth123',
+          toTokenSymbol: 'ETH',
           outputTokenDecimals: 18,
-          outputChainId: 1,
+          toChainId: 1,
           targetPrice: '2500', // Above current price of ~2100
         })
       ).rejects.toThrow('Buy order target price must be below current market price');
@@ -147,15 +147,15 @@ describe('LimitOrderService', () => {
         limitOrderService.createOrder({
           userId: 'user_test123',
           orderType: 'sell',
-          inputTokenAddress: '0xeth123',
-          inputTokenSymbol: 'ETH',
+          fromTokenAddress: '0xeth123',
+          fromTokenSymbol: 'ETH',
           inputTokenDecimals: 18,
-          inputChainId: 1,
+          fromChainId: 1,
           inputAmount: '1',
-          outputTokenAddress: '0xusdc123',
-          outputTokenSymbol: 'USDC',
+          toTokenAddress: '0xusdc123',
+          toTokenSymbol: 'USDC',
           outputTokenDecimals: 6,
-          outputChainId: 1,
+          toChainId: 1,
           targetPrice: '1800', // Below current price
         })
       ).rejects.toThrow('Sell order target price must be above current market price');
@@ -168,15 +168,15 @@ describe('LimitOrderService', () => {
         limitOrderService.createOrder({
           userId: 'user_test123',
           orderType: 'buy',
-          inputTokenAddress: '0xusdc123',
-          inputTokenSymbol: 'USDC',
+          fromTokenAddress: '0xusdc123',
+          fromTokenSymbol: 'USDC',
           inputTokenDecimals: 6,
-          inputChainId: 1,
+          fromChainId: 1,
           inputAmount: '1000',
-          outputTokenAddress: '0xeth123',
-          outputTokenSymbol: 'ETH',
+          toTokenAddress: '0xeth123',
+          toTokenSymbol: 'ETH',
           outputTokenDecimals: 18,
-          outputChainId: 1,
+          toChainId: 1,
           targetPrice: '2000',
         })
       ).rejects.toThrow('Unable to fetch current market price');
@@ -189,15 +189,15 @@ describe('LimitOrderService', () => {
       await limitOrderService.createOrder({
         userId: 'user_test123',
         orderType: 'buy',
-        inputTokenAddress: '0xusdc123',
-        inputTokenSymbol: 'USDC',
+        fromTokenAddress: '0xusdc123',
+        fromTokenSymbol: 'USDC',
         inputTokenDecimals: 6,
-        inputChainId: 1,
+        fromChainId: 1,
         inputAmount: '1000',
-        outputTokenAddress: '0xeth123',
-        outputTokenSymbol: 'ETH',
+        toTokenAddress: '0xeth123',
+        toTokenSymbol: 'ETH',
         outputTokenDecimals: 18,
-        outputChainId: 1,
+        toChainId: 1,
         targetPrice: '2000',
         expiresIn: 86400000, // 24 hours
       });
@@ -221,17 +221,17 @@ describe('LimitOrderService', () => {
       prismaMock.limitOrder.findFirst.mockResolvedValue(mockOrder as any);
       prismaMock.limitOrder.update.mockResolvedValue({
         ...mockOrder,
-        status: LimitOrderStatus.CANCELLED,
+        status: OrderStatus.CANCELLED,
         cancelledAt: new Date(),
       } as any);
 
       const result = await limitOrderService.cancelOrder('order_test123', 'user_test123');
 
-      expect(result.status).toBe(LimitOrderStatus.CANCELLED);
+      expect(result.status).toBe(OrderStatus.CANCELLED);
       expect(prismaMock.limitOrder.update).toHaveBeenCalledWith({
         where: { id: 'order_test123' },
         data: expect.objectContaining({
-          status: LimitOrderStatus.CANCELLED,
+          status: OrderStatus.CANCELLED,
           cancelledAt: expect.any(Date),
         }),
       });
@@ -319,7 +319,7 @@ describe('LimitOrderService', () => {
       prismaMock.limitOrder.findUnique.mockResolvedValue(mockOrder as any);
       prismaMock.limitOrder.update.mockResolvedValue({
         ...mockOrder,
-        status: LimitOrderStatus.EXPIRED,
+        status: OrderStatus.EXPIRED,
       } as any);
 
       const result = await limitOrderService.checkOrder('order_test123');
@@ -328,7 +328,7 @@ describe('LimitOrderService', () => {
       expect(result.reason).toBe('Order expired');
       expect(prismaMock.limitOrder.update).toHaveBeenCalledWith({
         where: { id: 'order_test123' },
-        data: { status: LimitOrderStatus.EXPIRED },
+        data: { status: OrderStatus.EXPIRED },
       });
     });
 
@@ -387,7 +387,7 @@ describe('LimitOrderService', () => {
       prismaMock.limitOrder.aggregate.mockResolvedValue({
         _sum: {
           inputAmount: new Prisma.Decimal(10000),
-          platformFeeAmount: new Prisma.Decimal(40),
+          platformFeeUsd: new Prisma.Decimal(40),
         },
       } as any);
 
@@ -435,7 +435,7 @@ describe('LimitOrderService', () => {
 
       await limitOrderService.getUserOrders(
         'user_test123',
-        { status: [LimitOrderStatus.PENDING, LimitOrderStatus.PARTIALLY_FILLED] },
+        { status: [OrderStatus.PENDING, OrderStatus.PARTIALLY_FILLED] },
         50,
         0
       );
@@ -443,7 +443,7 @@ describe('LimitOrderService', () => {
       expect(prismaMock.limitOrder.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            status: { in: [LimitOrderStatus.PENDING, LimitOrderStatus.PARTIALLY_FILLED] },
+            status: { in: [OrderStatus.PENDING, OrderStatus.PARTIALLY_FILLED] },
           }),
         })
       );

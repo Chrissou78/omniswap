@@ -1,5 +1,15 @@
 import axios, { AxiosInstance } from 'axios';
-import { logger } from '../utils/logger';
+import { logger } from '../../utils/logger';
+import { BaseAdapter, AdapterQuoteParams, AdapterQuoteResult, AdapterConfig } from '../base.adapter';
+
+export interface OneInchConfig extends AdapterConfig {
+  apiKey: string;
+}
+
+const DEFAULT_CONFIG: Partial<OneInchConfig> = {
+  baseUrl: 'https://api.1inch.dev',
+  timeout: 30000,
+};
 
 export interface OneInchQuoteRequest {
   chainId: number;
@@ -10,27 +20,11 @@ export interface OneInchQuoteRequest {
   fromAddress?: string;
   protocols?: string;
   fee?: number;
-  gasPrice?: string;
-  complexityLevel?: number;
-  parts?: number;
-  mainRouteParts?: number;
 }
 
 export interface OneInchQuoteResponse {
-  fromToken: {
-    symbol: string;
-    name: string;
-    decimals: number;
-    address: string;
-    logoURI: string;
-  };
-  toToken: {
-    symbol: string;
-    name: string;
-    decimals: number;
-    address: string;
-    logoURI: string;
-  };
+  fromToken: { symbol: string; name: string; decimals: number; address: string; logoURI?: string };
+  toToken: { symbol: string; name: string; decimals: number; address: string; logoURI?: string };
   toAmount: string;
   fromAmount: string;
   protocols: any[];
@@ -38,172 +32,108 @@ export interface OneInchQuoteResponse {
   estimatedPriceImpact?: number;
 }
 
-export interface OneInchSwapRequest extends OneInchQuoteRequest {
-  fromAddress: string;
-  destReceiver?: string;
-  referrerAddress?: string;
-  disableEstimate?: boolean;
-  permit?: string;
-}
+export class OneInchAdapter extends BaseAdapter {
+  readonly name = '1inch';
+  readonly type = 'DEX' as const;
+  readonly supportedChains = ['1', '56', '137', '42161', '10', '8453', '43114'];
 
-export interface OneInchSwapResponse extends OneInchQuoteResponse {
-  tx: {
-    from: string;
-    to: string;
-    data: string;
-    value: string;
-    gasPrice: string;
-    gas: string;
-  };
-}
-
-export class OneInchAdapter {
   private client: AxiosInstance;
   private apiKey: string;
 
-  private readonly SUPPORTED_CHAINS = [1, 56, 137, 42161, 10, 8453, 43114];
+  constructor(config: OneInchConfig) {
+    const mergedConfig = { ...DEFAULT_CONFIG, ...config };
+    super(mergedConfig as AdapterConfig);
+    this.apiKey = config.apiKey;
 
-  constructor(apiKey: string) {
-    this.apiKey = apiKey;
     this.client = axios.create({
-      baseURL: 'https://api.1inch.dev',
+      baseURL: mergedConfig.baseUrl,
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
+        'Authorization': `Bearer ${config.apiKey}`,
         'Content-Type': 'application/json',
       },
-      timeout: 30000,
+      timeout: mergedConfig.timeout || 30000,
     });
   }
 
-  isChainSupported(chainId: number): boolean {
-    return this.SUPPORTED_CHAINS.includes(chainId);
+  canHandle(params: AdapterQuoteParams): boolean {
+    const fromChainId = params.fromChainId || params.inputToken.chainId;
+    const toChainId = params.toChainId || params.outputToken.chainId;
+    // 1inch only handles same-chain swaps
+    return fromChainId === toChainId && this.supportsChain(fromChainId);
   }
 
-  async getQuote(request: OneInchQuoteRequest): Promise<OneInchQuoteResponse | null> {
-    if (!this.isChainSupported(request.chainId)) {
-      logger.warn('Chain not supported by 1inch', { chainId: request.chainId });
+  async getQuote(params: AdapterQuoteParams): Promise<AdapterQuoteResult | null> {
+    const chainId = params.fromChainId || params.inputToken.chainId;
+    if (!this.supportsChain(chainId)) {
+      logger.warn('Chain not supported by 1inch', { chainId });
       return null;
     }
 
     try {
-      const params = new URLSearchParams({
-        src: request.fromTokenAddress,
-        dst: request.toTokenAddress,
-        amount: request.amount,
+      const urlParams = new URLSearchParams({
+        src: params.inputToken.address,
+        dst: params.outputToken.address,
+        amount: params.inputAmount,
         includeProtocols: 'true',
         includeGas: 'true',
       });
 
-      if (request.fromAddress) {
-        params.append('from', request.fromAddress);
-      }
-      if (request.protocols) {
-        params.append('protocols', request.protocols);
-      }
-      if (request.fee) {
-        params.append('fee', request.fee.toString());
+      if (params.userAddress) {
+        urlParams.append('from', params.userAddress);
       }
 
-      const response = await this.client.get(
-        `/swap/v6.0/${request.chainId}/quote?${params.toString()}`
-      );
+      const response = await this.client.get(`/swap/v6.0/${chainId}/quote?${urlParams.toString()}`);
+      const data: OneInchQuoteResponse = response.data;
 
-      return response.data;
+      return {
+        outputAmount: data.toAmount,
+        minimumOutput: data.toAmount, // Will be adjusted with slippage during swap
+        estimatedGas: data.estimatedGas,
+        estimatedTime: 30, // ~30 seconds for same-chain
+        priceImpact: data.estimatedPriceImpact || 0,
+        route: [{
+          type: 'SWAP' as const,
+          protocol: '1inch',
+          chainId,
+          inputToken: params.inputToken,
+          outputToken: params.outputToken,
+          inputAmount: params.inputAmount,
+          expectedOutput: data.toAmount,
+          minimumOutput: data.toAmount,
+          estimatedTime: 30,
+        }],
+      };
     } catch (error: any) {
-      logger.error('1inch quote error', {
-        chainId: request.chainId,
-        error: error.response?.data || error.message,
-      });
+      logger.error('1inch quote error', { chainId, error: error.response?.data || error.message });
       return null;
     }
   }
 
-  async getSwapData(request: OneInchSwapRequest): Promise<OneInchSwapResponse | null> {
-    if (!this.isChainSupported(request.chainId)) {
-      return null;
-    }
+  async buildTransaction(
+    params: AdapterQuoteParams,
+    quote: AdapterQuoteResult
+  ): Promise<{ to: string; data: string; value: string; gasLimit?: string }> {
+    const chainId = params.fromChainId || params.inputToken.chainId;
+    if (!params.userAddress) throw new Error('userAddress required for swap');
 
-    try {
-      const params = new URLSearchParams({
-        src: request.fromTokenAddress,
-        dst: request.toTokenAddress,
-        amount: request.amount,
-        from: request.fromAddress,
-        slippage: request.slippage.toString(),
-        includeProtocols: 'true',
-        includeGas: 'true',
-      });
+    const urlParams = new URLSearchParams({
+      src: params.inputToken.address,
+      dst: params.outputToken.address,
+      amount: params.inputAmount,
+      from: params.userAddress,
+      slippage: params.slippage.toString(),
+      includeProtocols: 'true',
+      includeGas: 'true',
+    });
 
-      if (request.destReceiver) {
-        params.append('receiver', request.destReceiver);
-      }
-      if (request.referrerAddress) {
-        params.append('referrer', request.referrerAddress);
-      }
-      if (request.disableEstimate) {
-        params.append('disableEstimate', 'true');
-      }
+    const response = await this.client.get(`/swap/v6.0/${chainId}/swap?${urlParams.toString()}`);
+    const tx = response.data.tx;
 
-      const response = await this.client.get(
-        `/swap/v6.0/${request.chainId}/swap?${params.toString()}`
-      );
-
-      return response.data;
-    } catch (error: any) {
-      logger.error('1inch swap error', {
-        chainId: request.chainId,
-        error: error.response?.data || error.message,
-      });
-      return null;
-    }
-  }
-
-  async getApproveCalldata(
-    chainId: number,
-    tokenAddress: string,
-    amount?: string
-  ): Promise<{ to: string; data: string; value: string } | null> {
-    try {
-      const params = new URLSearchParams({
-        tokenAddress,
-      });
-
-      if (amount) {
-        params.append('amount', amount);
-      }
-
-      const response = await this.client.get(
-        `/swap/v6.0/${chainId}/approve/transaction?${params.toString()}`
-      );
-
-      return response.data;
-    } catch (error: any) {
-      logger.error('1inch approve error', { chainId, error: error.message });
-      return null;
-    }
-  }
-
-  async getSpenderAddress(chainId: number): Promise<string | null> {
-    try {
-      const response = await this.client.get(
-        `/swap/v6.0/${chainId}/approve/spender`
-      );
-      return response.data.address;
-    } catch (error: any) {
-      logger.error('1inch spender error', { chainId, error: error.message });
-      return null;
-    }
-  }
-
-  async getTokens(chainId: number): Promise<Record<string, any> | null> {
-    try {
-      const response = await this.client.get(
-        `/swap/v6.0/${chainId}/tokens`
-      );
-      return response.data.tokens;
-    } catch (error: any) {
-      logger.error('1inch tokens error', { chainId, error: error.message });
-      return null;
-    }
+    return {
+      to: tx.to,
+      data: tx.data,
+      value: tx.value || '0',
+      gasLimit: tx.gas,
+    };
   }
 }

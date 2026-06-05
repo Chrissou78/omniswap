@@ -1,66 +1,65 @@
 import axios, { AxiosInstance } from 'axios';
-import { logger } from '../utils/logger';
+import { logger } from '../../utils/logger';
+import { BaseAdapter, AdapterQuoteParams, AdapterQuoteResult, AdapterConfig } from '../base.adapter';
 
-export interface CetusQuoteRequest {
-  inputCoin: string;
-  outputCoin: string;
-  amount: string;
-  slippageBps: number;
-  byAmountIn?: boolean;
+export interface CetusConfig extends AdapterConfig {
+  // No additional config needed
 }
 
-export interface CetusQuoteResponse {
-  inputCoin: string;
-  outputCoin: string;
-  inputAmount: string;
-  outputAmount: string;
-  priceImpactBps: number;
-  estimatedGas: string;
-  route: CetusRouteStep[];
-  rawQuote: any;
-}
+const DEFAULT_CONFIG: CetusConfig = {
+  baseUrl: 'https://api-sui.cetus.zone',
+  timeout: 30000,
+};
 
-export interface CetusRouteStep {
-  poolId: string;
-  coinTypeA: string;
-  coinTypeB: string;
-  amountIn: string;
-  amountOut: string;
-  aToB: boolean;
-}
+export class CetusAdapter extends BaseAdapter {
+  readonly name = 'cetus';
+  readonly type = 'DEX' as const;
+  readonly supportedChains = ['sui', '784'];
 
-export interface CetusSwapRequest {
-  quote: CetusQuoteResponse;
-  senderAddress: string;
-  slippageBps: number;
-}
-
-export class CetusAdapter {
   private client: AxiosInstance;
   private readonly SUI_COIN_TYPE = '0x2::sui::SUI';
 
-  constructor() {
+  constructor(config: Partial<CetusConfig> = {}) {
+    const mergedConfig = { ...DEFAULT_CONFIG, ...config };
+    super(mergedConfig);
+
     this.client = axios.create({
-      baseURL: 'https://api-sui.cetus.zone',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      timeout: 30000,
+      baseURL: mergedConfig.baseUrl,
+      headers: { 'Content-Type': 'application/json' },
+      timeout: mergedConfig.timeout || 30000,
     });
   }
 
-  async getQuote(request: CetusQuoteRequest): Promise<CetusQuoteResponse | null> {
+  canHandle(params: AdapterQuoteParams): boolean {
+    const fromChainId = params.fromChainId || params.inputToken.chainId;
+    const toChainId = params.toChainId || params.outputToken.chainId;
+    // Cetus only handles Sui same-chain swaps
+    return fromChainId === toChainId && this.supportsChain(fromChainId);
+  }
+
+  private formatCoinType(coinType: string): string {
+    if (coinType.toLowerCase() === 'sui' || coinType === '0x2::sui::SUI') {
+      return this.SUI_COIN_TYPE;
+    }
+    return coinType.startsWith('0x') ? coinType : `0x${coinType}`;
+  }
+
+  async getQuote(params: AdapterQuoteParams): Promise<AdapterQuoteResult | null> {
+    const chainId = params.fromChainId || params.inputToken.chainId;
+    if (!this.supportsChain(chainId)) {
+      return null;
+    }
+
     try {
-      // Format coin types
-      const inputCoin = this.formatCoinType(request.inputCoin);
-      const outputCoin = this.formatCoinType(request.outputCoin);
+      const inputCoin = this.formatCoinType(params.inputToken.address);
+      const outputCoin = this.formatCoinType(params.outputToken.address);
 
       const response = await this.client.post('/v2/sui/swap/calculate', {
         coinTypeA: inputCoin,
         coinTypeB: outputCoin,
-        amount: request.amount,
-        byAmountIn: request.byAmountIn ?? true,
-        slippage: request.slippageBps / 10000,
+        amount: params.inputAmount,
+        byAmountIn: true,
+        slippage: params.slippage / 100,
       });
 
       if (!response.data || response.data.code !== 0) {
@@ -69,105 +68,42 @@ export class CetusAdapter {
       }
 
       const data = response.data.data;
+      const outputAmount = data.estimatedAmountOut || data.amountOut;
 
       return {
-        inputCoin,
-        outputCoin,
-        inputAmount: request.amount,
-        outputAmount: data.estimatedAmountOut || data.amountOut,
-        priceImpactBps: Math.round((data.priceImpact || 0) * 10000),
-        estimatedGas: data.estimatedGas || '1000000',
-        route: data.routes?.map((r: any) => ({
-          poolId: r.poolAddress,
-          coinTypeA: r.coinTypeA,
-          coinTypeB: r.coinTypeB,
-          amountIn: r.amountIn,
-          amountOut: r.amountOut,
-          aToB: r.a2b,
-        })) || [],
-        rawQuote: data,
+        outputAmount,
+        minimumOutput: this.calculateMinOutput(outputAmount, params.slippage),
+        estimatedTime: 5, // Sui is very fast
+        priceImpact: (data.priceImpact || 0) * 100,
+        route: [{
+          type: 'SWAP' as const,
+          protocol: 'Cetus',
+          chainId,
+          inputToken: params.inputToken,
+          outputToken: params.outputToken,
+          inputAmount: params.inputAmount,
+          expectedOutput: outputAmount,
+          minimumOutput: this.calculateMinOutput(outputAmount, params.slippage),
+          estimatedTime: 5,
+        }],
       };
     } catch (error: any) {
-      logger.error('Cetus quote error', {
-        inputCoin: request.inputCoin,
-        outputCoin: request.outputCoin,
-        error: error.response?.data || error.message,
-      });
+      logger.error('Cetus quote error', { error: error.response?.data || error.message });
       return null;
     }
   }
 
-  async buildSwapTransaction(request: CetusSwapRequest): Promise<{
-    txBytes: string;
-    estimatedGas: string;
-  } | null> {
-    try {
-      const response = await this.client.post('/v2/sui/swap/build-transaction', {
-        routes: request.quote.route,
-        coinTypeA: request.quote.inputCoin,
-        coinTypeB: request.quote.outputCoin,
-        amountIn: request.quote.inputAmount,
-        minAmountOut: this.calculateMinOutput(
-          request.quote.outputAmount,
-          request.slippageBps
-        ),
-        sender: request.senderAddress,
-        slippage: request.slippageBps / 10000,
-      });
-
-      if (!response.data || response.data.code !== 0) {
-        logger.warn('Cetus build transaction error', { data: response.data });
-        return null;
-      }
-
-      return {
-        txBytes: response.data.data.txBytes,
-        estimatedGas: response.data.data.estimatedGas,
-      };
-    } catch (error: any) {
-      logger.error('Cetus build transaction error', {
-        error: error.response?.data || error.message,
-      });
-      return null;
-    }
-  }
-
-  async getPools(): Promise<any[]> {
-    try {
-      const response = await this.client.get('/v2/sui/pools');
-      return response.data?.data?.pools || [];
-    } catch (error) {
-      logger.error('Cetus pools error', { error });
-      return [];
-    }
-  }
-
-  async getTokens(): Promise<any[]> {
-    try {
-      const response = await this.client.get('/v2/sui/tokens');
-      return response.data?.data?.tokens || [];
-    } catch (error) {
-      logger.error('Cetus tokens error', { error });
-      return [];
-    }
-  }
-
-  private formatCoinType(coinType: string): string {
-    // Handle native SUI
-    if (coinType.toLowerCase() === 'sui' || coinType === '0x2::sui::SUI') {
-      return this.SUI_COIN_TYPE;
-    }
-    // Ensure proper format
-    if (!coinType.startsWith('0x')) {
-      return `0x${coinType}`;
-    }
-    return coinType;
-  }
-
-  private calculateMinOutput(outputAmount: string, slippageBps: number): string {
+  private calculateMinOutput(outputAmount: string, slippagePercent: number): string {
     const amount = BigInt(outputAmount);
-    const slippage = BigInt(slippageBps);
-    const minOutput = amount - (amount * slippage / 10000n);
+    const slippageBps = BigInt(Math.round(slippagePercent * 100));
+    const minOutput = amount - (amount * slippageBps / 10000n);
     return minOutput.toString();
+  }
+
+  async buildTransaction(
+    params: AdapterQuoteParams,
+    quote: AdapterQuoteResult
+  ): Promise<{ to: string; data: string; value: string; gasLimit?: string }> {
+    throw new Error('Cetus requires Sui-specific transaction building');
   }
 }

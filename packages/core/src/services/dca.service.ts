@@ -23,30 +23,30 @@ export interface CreateDCAInput {
   userId: string;
   tenantId?: string;
   name?: string;
-  inputTokenAddress: string;
-  inputTokenSymbol: string;
+  fromTokenAddress: string;
+  fromTokenSymbol: string;
   inputTokenDecimals: number;
   inputTokenLogoURI?: string;
-  inputChainId: number;
-  outputTokenAddress: string;
-  outputTokenSymbol: string;
+  fromChainId: number;
+  toTokenAddress: string;
+  toTokenSymbol: string;
   outputTokenDecimals: number;
   outputTokenLogoURI?: string;
-  outputChainId: number;
+  toChainId: number;
   amountPerExecution: string;
   frequency: 'hourly' | 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'custom';
-  customIntervalMs?: number;
+  customIntervalHours?: number;
   totalExecutions: number;
-  slippageBps?: number;
-  maxPriceImpactBps?: number;
+  slippage?: number;
+  maxPriceImpact?: number;
   skipOnHighGas?: boolean;
   maxGasUsd?: number;
 }
 
 export interface UpdateDCAInput {
   name?: string;
-  slippageBps?: number;
-  maxPriceImpactBps?: number;
+  slippage?: number;
+  maxPriceImpact?: number;
   skipOnHighGas?: boolean;
   maxGasUsd?: number;
 }
@@ -137,30 +137,30 @@ export class DCAService {
       userId,
       tenantId,
       name,
-      inputTokenAddress,
-      inputTokenSymbol,
+      fromTokenAddress,
+      fromTokenSymbol,
       inputTokenDecimals,
       inputTokenLogoURI,
-      inputChainId,
-      outputTokenAddress,
-      outputTokenSymbol,
+      fromChainId,
+      toTokenAddress,
+      toTokenSymbol,
       outputTokenDecimals,
       outputTokenLogoURI,
-      outputChainId,
+      toChainId,
       amountPerExecution,
       frequency,
-      customIntervalMs,
+      customIntervalHours,
       totalExecutions,
-      slippageBps = this.DEFAULT_SLIPPAGE_BPS,
-      maxPriceImpactBps = this.DEFAULT_MAX_PRICE_IMPACT_BPS,
+      slippage = this.DEFAULT_SLIPPAGE_BPS,
+      maxPriceImpact = this.DEFAULT_MAX_PRICE_IMPACT_BPS,
       skipOnHighGas = false,
       maxGasUsd,
     } = input;
 
     // Validate frequency
     const dcaFrequency = this.mapFrequency(frequency);
-    if (dcaFrequency === DCAFrequency.CUSTOM && !customIntervalMs) {
-      throw new Error('customIntervalMs required for custom frequency');
+    if (dcaFrequency === DCAFrequency.CUSTOM && !customIntervalHours) {
+      throw new Error('customIntervalHours required for custom frequency');
     }
 
     // Validate total executions
@@ -170,12 +170,12 @@ export class DCAService {
 
     // Calculate first execution time
     const intervalMs = dcaFrequency === DCAFrequency.CUSTOM
-      ? customIntervalMs!
+      ? customIntervalHours!
       : FREQUENCY_MS[dcaFrequency];
     const nextExecutionAt = new Date(Date.now() + intervalMs);
 
     // Get tenant fee config
-    let platformFeeBps = this.DEFAULT_PLATFORM_FEE_BPS;
+    let platformFeeUsd = this.DEFAULT_PLATFORM_FEE_BPS;
     if (tenantId) {
       const tenant = await this.prisma.tenant.findUnique({
         where: { id: tenantId },
@@ -183,7 +183,7 @@ export class DCAService {
       });
       if (tenant?.feeConfig) {
         const feeConfig = tenant.feeConfig as { dcaFeeBps?: number };
-        platformFeeBps = feeConfig.dcaFeeBps ?? this.DEFAULT_PLATFORM_FEE_BPS;
+        platformFeeUsd = feeConfig.dcaFeeBps ?? this.DEFAULT_PLATFORM_FEE_BPS;
       }
     }
 
@@ -192,28 +192,28 @@ export class DCAService {
       data: {
         userId,
         tenantId,
-        name: name || `DCA ${inputTokenSymbol} → ${outputTokenSymbol}`,
+        name: name || `DCA ${fromTokenSymbol} → ${toTokenSymbol}`,
         status: DCAStatus.ACTIVE,
-        inputTokenAddress: inputTokenAddress.toLowerCase(),
-        inputTokenSymbol,
+        fromTokenAddress: fromTokenAddress.toLowerCase(),
+        fromTokenSymbol,
         inputTokenDecimals,
         inputTokenLogoURI,
-        inputChainId,
-        outputTokenAddress: outputTokenAddress.toLowerCase(),
-        outputTokenSymbol,
+        fromChainId,
+        toTokenAddress: toTokenAddress.toLowerCase(),
+        toTokenSymbol,
         outputTokenDecimals,
         outputTokenLogoURI,
-        outputChainId,
+        toChainId,
         amountPerExecution: new Prisma.Decimal(amountPerExecution),
         frequency: dcaFrequency,
-        customIntervalMs: customIntervalMs ? BigInt(customIntervalMs) : null,
+        customIntervalHours: customIntervalHours ? BigInt(customIntervalHours) : null,
         totalExecutions,
         nextExecutionAt,
-        slippageBps,
-        maxPriceImpactBps,
+        slippage,
+        maxPriceImpact,
         skipOnHighGas,
         maxGasUsd: maxGasUsd ? new Prisma.Decimal(maxGasUsd) : null,
-        platformFeeBps,
+        platformFeeUsd,
       },
     });
 
@@ -225,8 +225,8 @@ export class DCAService {
     logger.info('DCA strategy created', {
       strategyId: strategy.id,
       userId,
-      inputToken: inputTokenSymbol,
-      outputToken: outputTokenSymbol,
+      inputToken: fromTokenSymbol,
+      outputToken: toTokenSymbol,
       frequency,
       totalExecutions,
     });
@@ -254,8 +254,8 @@ export class DCAService {
     const updateData: Prisma.DCAStrategyUpdateInput = {};
 
     if (input.name !== undefined) updateData.name = input.name;
-    if (input.slippageBps !== undefined) updateData.slippageBps = input.slippageBps;
-    if (input.maxPriceImpactBps !== undefined) updateData.maxPriceImpactBps = input.maxPriceImpactBps;
+    if (input.slippage !== undefined) updateData.slippage = input.slippage;
+    if (input.maxPriceImpact !== undefined) updateData.maxPriceImpact = input.maxPriceImpact;
     if (input.skipOnHighGas !== undefined) updateData.skipOnHighGas = input.skipOnHighGas;
     if (input.maxGasUsd !== undefined) {
       updateData.maxGasUsd = input.maxGasUsd ? new Prisma.Decimal(input.maxGasUsd) : null;
@@ -314,7 +314,7 @@ export class DCAService {
 
     // Calculate next execution
     const intervalMs = existing.frequency === DCAFrequency.CUSTOM
-      ? Number(existing.customIntervalMs)
+      ? Number(existing.customIntervalHours)
       : FREQUENCY_MS[existing.frequency];
     const nextExecutionAt = new Date(Date.now() + intervalMs);
 
@@ -333,7 +333,7 @@ export class DCAService {
     await this.scheduleExecution(
       strategyId,
       nextExecutionAt,
-      existing.executionsCompleted + 1
+      existing.executedCount + 1
     );
 
     await this.invalidateStatsCache(userId);
@@ -446,8 +446,8 @@ export class DCAService {
       this.prisma.dCAStrategy.aggregate({
         where: { userId },
         _sum: {
-          totalInputSpent: true,
-          totalOutputReceived: true,
+          totalInputAmount: true,
+          totalOutputAmount: true,
           totalPlatformFees: true,
           totalGasFees: true,
         },
@@ -458,8 +458,8 @@ export class DCAService {
       totalStrategies,
       activeStrategies,
       completedStrategies,
-      totalInvested: Number(aggregates._sum.totalInputSpent || 0),
-      totalReceived: Number(aggregates._sum.totalOutputReceived || 0),
+      totalInvested: Number(aggregates._sum.totalInputAmount || 0),
+      totalReceived: Number(aggregates._sum.totalOutputAmount || 0),
       totalFees: Number(aggregates._sum.totalPlatformFees || 0) + 
                  Number(aggregates._sum.totalGasFees || 0),
     };
@@ -574,7 +574,7 @@ export class DCAService {
 
       // Check gas price if configured
       if (strategy.skipOnHighGas && strategy.maxGasUsd) {
-        const currentGasUsd = await this.gasService.getGasPriceUsd(strategy.inputChainId);
+        const currentGasUsd = await this.gasService.getGasPriceUsd(strategy.fromChainId);
         if (currentGasUsd > Number(strategy.maxGasUsd)) {
           await this.handleSkippedExecution(strategy, execution, 'Gas price too high');
           return;
@@ -583,12 +583,12 @@ export class DCAService {
 
       // Get quote
       const quote = await this.quoteService.getQuote({
-        inputChainId: strategy.inputChainId,
-        inputTokenAddress: strategy.inputTokenAddress,
-        outputChainId: strategy.outputChainId,
-        outputTokenAddress: strategy.outputTokenAddress,
+        fromChainId: strategy.fromChainId,
+        fromTokenAddress: strategy.fromTokenAddress,
+        toChainId: strategy.toChainId,
+        toTokenAddress: strategy.toTokenAddress,
         inputAmount: strategy.amountPerExecution.toString(),
-        slippageBps: strategy.slippageBps,
+        slippage: strategy.slippage,
         userId: strategy.userId,
       });
 
@@ -599,7 +599,7 @@ export class DCAService {
       const bestRoute = quote.routes[0];
 
       // Check price impact
-      if (bestRoute.priceImpactBps && bestRoute.priceImpactBps > strategy.maxPriceImpactBps) {
+      if (bestRoute.priceImpactBps && bestRoute.priceImpactBps > strategy.maxPriceImpact) {
         await this.handleSkippedExecution(
           strategy,
           execution,
@@ -617,7 +617,7 @@ export class DCAService {
 
       // Calculate fees
       const inputAmountNum = Number(strategy.amountPerExecution);
-      const platformFeeAmount = (inputAmountNum * strategy.platformFeeBps) / 10000;
+      const platformFeeUsd = (inputAmountNum * strategy.platformFeeUsd) / 10000;
       const executionPrice = inputAmountNum / parseFloat(result.outputAmount);
 
       // Update execution as completed
@@ -628,7 +628,7 @@ export class DCAService {
           outputAmount: new Prisma.Decimal(result.outputAmount),
           executionPrice: new Prisma.Decimal(executionPrice),
           priceImpactBps: bestRoute.priceImpactBps,
-          platformFeeAmount: new Prisma.Decimal(platformFeeAmount),
+          platformFeeUsd: new Prisma.Decimal(platformFeeUsd),
           gasFeeAmount: result.gasFee ? new Prisma.Decimal(result.gasFee) : null,
           txHash: result.txHash,
           blockNumber: result.blockNumber ? BigInt(result.blockNumber) : null,
@@ -638,19 +638,19 @@ export class DCAService {
       });
 
       // Update strategy stats
-      const newTotalInput = Number(strategy.totalInputSpent) + inputAmountNum;
-      const newTotalOutput = Number(strategy.totalOutputReceived) + parseFloat(result.outputAmount);
+      const newTotalInput = Number(strategy.totalInputAmount) + inputAmountNum;
+      const newTotalOutput = Number(strategy.totalOutputAmount) + parseFloat(result.outputAmount);
       const newAveragePrice = newTotalInput / newTotalOutput;
       const isCompleted = executionNumber >= strategy.totalExecutions;
 
       await this.prisma.dCAStrategy.update({
         where: { id: strategyId },
         data: {
-          executionsCompleted: { increment: 1 },
-          totalInputSpent: new Prisma.Decimal(newTotalInput),
-          totalOutputReceived: new Prisma.Decimal(newTotalOutput),
+          executedCount: { increment: 1 },
+          totalInputAmount: new Prisma.Decimal(newTotalInput),
+          totalOutputAmount: new Prisma.Decimal(newTotalOutput),
           averagePrice: new Prisma.Decimal(newAveragePrice),
-          totalPlatformFees: { increment: new Prisma.Decimal(platformFeeAmount) },
+          totalPlatformFees: { increment: new Prisma.Decimal(platformFeeUsd) },
           totalGasFees: result.gasFee
             ? { increment: new Prisma.Decimal(result.gasFee) }
             : undefined,
@@ -689,7 +689,7 @@ export class DCAService {
       where: { id: execution.id },
       data: {
         status: DCAExecutionStatus.SKIPPED,
-        errorMessage: reason,
+        error: reason,
         completedAt: new Date(),
       },
     });
@@ -713,7 +713,7 @@ export class DCAService {
       where: { id: execution.id },
       data: {
         status: DCAExecutionStatus.FAILED,
-        errorMessage: error.message,
+        error: error.message,
         completedAt: new Date(),
       },
     });
@@ -726,7 +726,7 @@ export class DCAService {
       data: {
         consecutiveFailures: newFailureCount,
         lastError: error.message,
-        status: shouldPause ? DCAStatus.FAILED : undefined,
+        status: shouldPause ? DCAStatus.CANCELLED : undefined,
       },
     });
 
@@ -753,7 +753,7 @@ export class DCAService {
     nextExecutionNumber: number
   ): Promise<void> {
     const intervalMs = strategy.frequency === DCAFrequency.CUSTOM
-      ? Number(strategy.customIntervalMs)
+      ? Number(strategy.customIntervalHours)
       : FREQUENCY_MS[strategy.frequency];
 
     const nextExecutionAt = new Date(Date.now() + intervalMs);
@@ -792,14 +792,14 @@ export class DCAService {
   private async enrichStrategyWithStats(strategy: DCAStrategy): Promise<DCAWithStats> {
     const currentPrice = await this.getCurrentPrice(strategy);
     const averagePrice = Number(strategy.averagePrice || 0);
-    const totalOutputReceived = Number(strategy.totalOutputReceived || 0);
+    const totalOutputAmount = Number(strategy.totalOutputAmount || 0);
 
     let unrealizedPnL = 0;
     let unrealizedPnLPercent = 0;
 
-    if (averagePrice > 0 && totalOutputReceived > 0) {
-      const currentValue = totalOutputReceived * currentPrice;
-      const costBasis = Number(strategy.totalInputSpent);
+    if (averagePrice > 0 && totalOutputAmount > 0) {
+      const currentValue = totalOutputAmount * currentPrice;
+      const costBasis = Number(strategy.totalInputAmount);
       unrealizedPnL = currentValue - costBasis;
       unrealizedPnLPercent = (unrealizedPnL / costBasis) * 100;
     }
@@ -813,7 +813,7 @@ export class DCAService {
   }
 
   private async getCurrentPrice(strategy: DCAStrategy): Promise<number> {
-    const cacheKey = `price:pair:${strategy.inputChainId}:${strategy.inputTokenAddress}:${strategy.outputChainId}:${strategy.outputTokenAddress}`;
+    const cacheKey = `price:pair:${strategy.fromChainId}:${strategy.fromTokenAddress}:${strategy.toChainId}:${strategy.toTokenAddress}`;
     const cached = await this.redis.get(cacheKey);
 
     if (cached) {
@@ -822,8 +822,8 @@ export class DCAService {
 
     try {
       const [inputPrice, outputPrice] = await Promise.all([
-        this.priceService.getTokenPrice(strategy.inputChainId, strategy.inputTokenAddress),
-        this.priceService.getTokenPrice(strategy.outputChainId, strategy.outputTokenAddress),
+        this.priceService.getTokenPrice(strategy.fromChainId, strategy.fromTokenAddress),
+        this.priceService.getTokenPrice(strategy.toChainId, strategy.toTokenAddress),
       ]);
 
       if (!inputPrice || !outputPrice) return 0;

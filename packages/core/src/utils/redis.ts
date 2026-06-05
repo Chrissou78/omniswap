@@ -214,3 +214,9 @@ export function getRedis(config?: RedisConfig): RedisClient {
 
 // Export type for ioredis
 export type { Redis };
+
+// Convenience export for direct redis access
+export const redis = {
+  get: getRedis,
+  Redis: RedisClient,
+};

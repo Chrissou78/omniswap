@@ -1,16 +1,21 @@
 // packages/core/src/executors/base.executor.ts
 
-import { Swap, SwapStepExecution, RouteStep, Token } from '@omniswap/types';
+import { RouteStep } from '@omniswap/types';
 
 export interface ExecutionContext {
-  swap: Swap;
+  swap: {
+    id: string;
+    userAddress: string;
+    route: { steps: RouteStep[] };
+  };
   step: RouteStep;
   stepIndex: number;
   userAddress: string;
-  
+
   // Signed transaction (from frontend)
   signedTransaction?: string;
-  
+  signature?: string;
+
   // For CEX
   cexCredentials?: {
     apiKey: string;
@@ -24,7 +29,7 @@ export interface ExecutionResult {
   blockNumber?: number;
   actualOutput?: string;
   error?: string;
-  
+
   // For async operations (bridges, CEX)
   pendingId?: string;
   estimatedCompletionTime?: number;
@@ -37,7 +42,7 @@ export interface TransactionStatus {
   blockNumber?: number;
   timestamp?: number;
   error?: string;
-  
+
   // For bridges
   destinationTxHash?: string;
   destinationStatus?: 'PENDING' | 'COMPLETED';
@@ -47,55 +52,25 @@ export abstract class BaseExecutor {
   abstract readonly chainType: 'EVM' | 'SOLANA' | 'SUI' | 'CEX';
   abstract readonly supportedChains: string[];
 
-  /**
-   * Check if executor supports the given chain
-   */
   supportsChain(chainId: string): boolean {
     return this.supportedChains.includes(chainId);
   }
 
-  /**
-   * Prepare transaction for signing
-   * Returns unsigned transaction data
-   */
-  abstract prepareTransaction(
-    context: ExecutionContext
-  ): Promise<{
+  abstract prepareTransaction(context: ExecutionContext): Promise<{
     to: string;
     data: string;
     value: string;
     gasLimit?: string;
     chainId?: number;
-    
-    // For non-EVM
     serializedTransaction?: string;
   }>;
 
-  /**
-   * Execute a signed transaction
-   */
-  abstract executeTransaction(
-    context: ExecutionContext
-  ): Promise<ExecutionResult>;
+  abstract executeTransaction(context: ExecutionContext): Promise<ExecutionResult>;
 
-  /**
-   * Get transaction status
-   */
-  abstract getTransactionStatus(
-    chainId: string,
-    txHash: string
-  ): Promise<TransactionStatus>;
+  abstract getTransactionStatus(chainId: string, txHash: string): Promise<TransactionStatus>;
 
-  /**
-   * Estimate gas for transaction
-   */
-  abstract estimateGas(
-    context: ExecutionContext
-  ): Promise<string>;
+  abstract estimateGas(context: ExecutionContext): Promise<string>;
 
-  /**
-   * Check token approval (EVM only, others return true)
-   */
   abstract checkAllowance(
     chainId: string,
     tokenAddress: string,
@@ -103,17 +78,10 @@ export abstract class BaseExecutor {
     spenderAddress: string
   ): Promise<bigint>;
 
-  /**
-   * Build approval transaction (EVM only)
-   */
   abstract buildApprovalTransaction(
     chainId: string,
     tokenAddress: string,
     spenderAddress: string,
     amount: string
-  ): Promise<{
-    to: string;
-    data: string;
-    value: string;
-  } | null>;
+  ): Promise<{ to: string; data: string; value: string } | null>;
 }

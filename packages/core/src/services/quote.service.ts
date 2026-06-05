@@ -11,12 +11,12 @@ import { PriceService } from './price.service';
 // ============================================================================
 
 export interface QuoteRequest {
-  inputChainId: number;
-  inputTokenAddress: string;
-  outputChainId: number;
-  outputTokenAddress: string;
+  fromChainId: number;
+  fromTokenAddress: string;
+  toChainId: number;
+  toTokenAddress: string;
   inputAmount: string;
-  slippageBps?: number;
+  slippage?: number;
   userAddress?: string;
   userId?: string;
 }
@@ -54,7 +54,7 @@ export interface TokenInfo {
   symbol: string;
   name: string;
   decimals: number;
-  logoURI?: string;
+  logoUrl?: string;
   chainId: number;
 }
 
@@ -63,17 +63,17 @@ export type RouteTag = 'BEST_RETURN' | 'FASTEST' | 'CHEAPEST';
 export interface Quote {
   id: string;
   userId?: string;
-  inputChainId: number;
-  inputTokenAddress: string;
-  inputTokenSymbol: string;
+  fromChainId: number;
+  fromTokenAddress: string;
+  fromTokenSymbol: string;
   inputAmount: string;
   inputAmountUsd: number;
-  outputChainId: number;
-  outputTokenAddress: string;
-  outputTokenSymbol: string;
+  toChainId: number;
+  toTokenAddress: string;
+  toTokenSymbol: string;
   routes: SwapRoute[];
-  platformFeeBps: number;
-  slippageBps: number;
+  platformFeeUsd: number;
+  slippage: number;
   expiresAt: Date;
   createdAt: Date;
 }
@@ -112,33 +112,33 @@ export class QuoteService {
 
   async getQuote(request: QuoteRequest): Promise<Quote> {
     const {
-      inputChainId,
-      inputTokenAddress,
-      outputChainId,
-      outputTokenAddress,
+      fromChainId,
+      fromTokenAddress,
+      toChainId,
+      toTokenAddress,
       inputAmount,
-      slippageBps = 50,
+      slippage = 50,
       userAddress,
       userId,
     } = request;
 
     const quoteId = this.generateQuoteId();
-    const isCrossChain = inputChainId !== outputChainId;
+    const isCrossChain = fromChainId !== toChainId;
 
     logger.info('Getting quote', {
       quoteId,
-      inputChainId,
-      outputChainId,
-      inputTokenAddress,
-      outputTokenAddress,
+      fromChainId,
+      toChainId,
+      fromTokenAddress,
+      toTokenAddress,
       inputAmount,
       isCrossChain,
     });
 
     // Get token prices for USD calculations
     const [inputPrice, outputPrice] = await Promise.all([
-      this.priceService.getTokenPrice(inputChainId, inputTokenAddress),
-      this.priceService.getTokenPrice(outputChainId, outputTokenAddress),
+      this.priceService.getTokenPrice(fromChainId, fromTokenAddress),
+      this.priceService.getTokenPrice(toChainId, toTokenAddress),
     ]);
 
     const inputAmountUsd = parseFloat(inputAmount) * (inputPrice || 0);
@@ -163,24 +163,24 @@ export class QuoteService {
 
     // Get token symbols
     const [inputTokenInfo, outputTokenInfo] = await Promise.all([
-      this.priceService.getTokenInfo(inputChainId, inputTokenAddress),
-      this.priceService.getTokenInfo(outputChainId, outputTokenAddress),
+      this.priceService.getTokenInfo(fromChainId, fromTokenAddress),
+      this.priceService.getTokenInfo(toChainId, toTokenAddress),
     ]);
 
     const quote: Quote = {
       id: quoteId,
       userId,
-      inputChainId,
-      inputTokenAddress,
-      inputTokenSymbol: inputTokenInfo?.symbol || 'UNKNOWN',
+      fromChainId,
+      fromTokenAddress,
+      fromTokenSymbol: inputTokenInfo?.symbol || 'UNKNOWN',
       inputAmount,
       inputAmountUsd,
-      outputChainId,
-      outputTokenAddress,
-      outputTokenSymbol: outputTokenInfo?.symbol || 'UNKNOWN',
+      toChainId,
+      toTokenAddress,
+      toTokenSymbol: outputTokenInfo?.symbol || 'UNKNOWN',
       routes,
-      platformFeeBps: this.PLATFORM_FEE_BPS,
-      slippageBps,
+      platformFeeUsd: this.PLATFORM_FEE_BPS,
+      slippage,
       expiresAt: new Date(Date.now() + this.QUOTE_EXPIRY_MS),
       createdAt: new Date(),
     };
@@ -220,12 +220,12 @@ export class QuoteService {
 
     // Create new quote with same parameters
     return this.getQuote({
-      inputChainId: existingQuote.inputChainId,
-      inputTokenAddress: existingQuote.inputTokenAddress,
-      outputChainId: existingQuote.outputChainId,
-      outputTokenAddress: existingQuote.outputTokenAddress,
+      fromChainId: existingQuote.fromChainId,
+      fromTokenAddress: existingQuote.fromTokenAddress,
+      toChainId: existingQuote.toChainId,
+      toTokenAddress: existingQuote.toTokenAddress,
       inputAmount: existingQuote.inputAmount,
-      slippageBps: existingQuote.slippageBps,
+      slippage: existingQuote.slippage,
       userId: existingQuote.userId,
     });
   }
@@ -239,28 +239,28 @@ export class QuoteService {
     inputPrice: number | null,
     outputPrice: number | null
   ): Promise<SwapRoute[]> {
-    const { inputChainId, inputTokenAddress, outputTokenAddress, inputAmount, slippageBps, userAddress } = request;
+    const { fromChainId, fromTokenAddress, toTokenAddress, inputAmount, slippage, userAddress } = request;
     const routes: SwapRoute[] = [];
 
     // Determine which adapter to use based on chain
-    if (inputChainId === 101) {
+    if (fromChainId === 101) {
       // Solana - Use Jupiter
       const jupiterRoutes = await this.getJupiterRoutes(
-        inputTokenAddress,
-        outputTokenAddress,
+        fromTokenAddress,
+        toTokenAddress,
         inputAmount,
-        slippageBps || 50,
+        slippage || 50,
         inputPrice,
         outputPrice
       );
       routes.push(...jupiterRoutes);
-    } else if (inputChainId === 784) {
+    } else if (fromChainId === 784) {
       // Sui - Use Cetus
       const cetusRoutes = await this.getCetusRoutes(
-        inputTokenAddress,
-        outputTokenAddress,
+        fromTokenAddress,
+        toTokenAddress,
         inputAmount,
-        slippageBps || 50,
+        slippage || 50,
         inputPrice,
         outputPrice
       );
@@ -268,11 +268,11 @@ export class QuoteService {
     } else {
       // EVM - Use 1inch
       const oneInchRoutes = await this.getOneInchRoutes(
-        inputChainId,
-        inputTokenAddress,
-        outputTokenAddress,
+        fromChainId,
+        fromTokenAddress,
+        toTokenAddress,
         inputAmount,
-        slippageBps || 50,
+        slippage || 50,
         userAddress,
         inputPrice,
         outputPrice
@@ -288,7 +288,7 @@ export class QuoteService {
     fromToken: string,
     toToken: string,
     amount: string,
-    slippageBps: number,
+    slippage: number,
     userAddress?: string,
     inputPrice?: number | null,
     outputPrice?: number | null
@@ -299,7 +299,7 @@ export class QuoteService {
         fromTokenAddress: fromToken,
         toTokenAddress: toToken,
         amount,
-        slippage: slippageBps / 100,
+        slippage: slippage / 100,
         fromAddress: userAddress,
       });
 
@@ -354,7 +354,7 @@ export class QuoteService {
     inputMint: string,
     outputMint: string,
     amount: string,
-    slippageBps: number,
+    slippage: number,
     inputPrice?: number | null,
     outputPrice?: number | null
   ): Promise<SwapRoute[]> {
@@ -363,7 +363,7 @@ export class QuoteService {
         inputMint,
         outputMint,
         amount,
-        slippageBps,
+        slippage,
       });
 
       if (!quote || !quote.routePlan) return [];
@@ -419,7 +419,7 @@ export class QuoteService {
     inputCoin: string,
     outputCoin: string,
     amount: string,
-    slippageBps: number,
+    slippage: number,
     inputPrice?: number | null,
     outputPrice?: number | null
   ): Promise<SwapRoute[]> {
@@ -428,7 +428,7 @@ export class QuoteService {
         inputCoin,
         outputCoin,
         amount,
-        slippageBps,
+        slippage,
       });
 
       if (!quote) return [];
@@ -489,12 +489,12 @@ export class QuoteService {
   ): Promise<SwapRoute[]> {
     try {
       const lifiRoutes = await this.lifiAdapter.getRoutes({
-        fromChainId: request.inputChainId,
-        fromTokenAddress: request.inputTokenAddress,
-        toChainId: request.outputChainId,
-        toTokenAddress: request.outputTokenAddress,
+        fromChainId: request.fromChainId,
+        fromTokenAddress: request.fromTokenAddress,
+        toChainId: request.toChainId,
+        toTokenAddress: request.toTokenAddress,
         fromAmount: request.inputAmount,
-        slippage: (request.slippageBps || 50) / 10000,
+        slippage: (request.slippage || 50) / 10000,
         fromAddress: request.userAddress,
       });
 

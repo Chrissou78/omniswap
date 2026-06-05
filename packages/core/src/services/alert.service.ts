@@ -16,9 +16,9 @@ export interface CreateAlertInput {
   tokenName: string;
   tokenLogoURI?: string;
   chainId: number;
-  alertType: 'above' | 'below' | 'percent_change';
+  type: 'above' | 'below' | 'percent_change';
   targetPrice?: number;
-  targetPercentChange?: number;
+  percentChange?: number;
   isRecurring?: boolean;
   cooldownMinutes?: number;
   notifyEmail?: boolean;
@@ -29,9 +29,9 @@ export interface CreateAlertInput {
 }
 
 export interface UpdateAlertInput {
-  alertType?: 'above' | 'below' | 'percent_change';
+  type?: 'above' | 'below' | 'percent_change';
   targetPrice?: number;
-  targetPercentChange?: number;
+  percentChange?: number;
   isEnabled?: boolean;
   isRecurring?: boolean;
   cooldownMinutes?: number;
@@ -59,9 +59,9 @@ export interface AlertHistoryItem {
   tokenSymbol: string;
   tokenLogoURI: string | null;
   chainId: number;
-  alertType: string;
+  type: string;
   targetPrice: number | null;
-  targetPercentChange: number | null;
+  percentChange: number | null;
   triggeredPrice: number;
   notificationsSent: string[];
   triggeredAt: Date;
@@ -108,9 +108,9 @@ export class AlertService {
       tokenName,
       tokenLogoURI,
       chainId,
-      alertType,
+      type,
       targetPrice,
-      targetPercentChange,
+      percentChange,
       isRecurring = false,
       cooldownMinutes = 0,
       notifyEmail = true,
@@ -121,14 +121,14 @@ export class AlertService {
     } = input;
 
     // Validate alert type and target
-    if (alertType === 'percent_change' && targetPercentChange === undefined) {
-      throw new Error('targetPercentChange is required for percent_change alerts');
+    if (type === 'percent_change' && percentChange === undefined) {
+      throw new Error('percentChange is required for percent_change alerts');
     }
-    if (alertType !== 'percent_change' && targetPrice === undefined) {
+    if (type !== 'percent_change' && targetPrice === undefined) {
       throw new Error('targetPrice is required for above/below alerts');
     }
 
-    // Get current price for priceAtCreation
+    // Get current price for basePrice
     const currentPrice = await this.priceService.getTokenPrice(chainId, tokenAddress);
     if (!currentPrice) {
       throw new Error('Unable to fetch current token price');
@@ -140,9 +140,9 @@ export class AlertService {
         userId,
         chainId,
         tokenAddress: tokenAddress.toLowerCase(),
-        alertType: this.mapAlertType(alertType),
+        type: this.maptype(type),
         targetPrice: targetPrice ? new Prisma.Decimal(targetPrice) : undefined,
-        targetPercentChange: targetPercentChange ? new Prisma.Decimal(targetPercentChange) : undefined,
+        percentChange: percentChange ? new Prisma.Decimal(percentChange) : undefined,
         isEnabled: true,
       },
     });
@@ -160,10 +160,10 @@ export class AlertService {
         tokenName,
         tokenLogoURI,
         chainId,
-        alertType: this.mapAlertType(alertType),
+        type: this.maptype(type),
         targetPrice: targetPrice ? new Prisma.Decimal(targetPrice) : null,
-        targetPercentChange: targetPercentChange ? new Prisma.Decimal(targetPercentChange) : null,
-        priceAtCreation: new Prisma.Decimal(currentPrice),
+        percentChange: percentChange ? new Prisma.Decimal(percentChange) : null,
+        basePrice: new Prisma.Decimal(currentPrice),
         isRecurring,
         cooldownMinutes,
         notifyEmail,
@@ -184,7 +184,7 @@ export class AlertService {
       { delay: 1000 }
     );
 
-    logger.info('Alert created', { alertId: alert.id, userId, tokenSymbol, alertType });
+    logger.info('Alert created', { alertId: alert.id, userId, tokenSymbol, type });
 
     return this.enrichAlertWithPrice(alert);
   }
@@ -202,14 +202,14 @@ export class AlertService {
     // Build update data
     const updateData: Prisma.PriceAlertUpdateInput = {};
 
-    if (input.alertType !== undefined) {
-      updateData.alertType = this.mapAlertType(input.alertType);
+    if (input.type !== undefined) {
+      updateData.type = this.maptype(input.type);
     }
     if (input.targetPrice !== undefined) {
       updateData.targetPrice = new Prisma.Decimal(input.targetPrice);
     }
-    if (input.targetPercentChange !== undefined) {
-      updateData.targetPercentChange = new Prisma.Decimal(input.targetPercentChange);
+    if (input.percentChange !== undefined) {
+      updateData.percentChange = new Prisma.Decimal(input.percentChange);
     }
     if (input.isEnabled !== undefined) {
       updateData.isEnabled = input.isEnabled;
@@ -352,9 +352,9 @@ export class AlertService {
       tokenSymbol: item.tokenSymbol,
       tokenLogoURI: item.tokenLogoURI,
       chainId: item.chainId,
-      alertType: item.alertType.toLowerCase(),
+      type: item.type.toLowerCase(),
       targetPrice: item.targetPrice ? Number(item.targetPrice) : null,
-      targetPercentChange: item.targetPercentChange ? Number(item.targetPercentChange) : null,
+      percentChange: item.percentChange ? Number(item.percentChange) : null,
       triggeredPrice: Number(item.triggeredPrice),
       notificationsSent: item.notificationsSent,
       triggeredAt: item.triggeredAt,
@@ -376,9 +376,9 @@ export class AlertService {
     }
 
     // Check cooldown
-    if (alert.isRecurring && alert.lastTriggeredAt) {
+    if (alert.isRecurring && alert.triggeredAt) {
       const cooldownMs = alert.cooldownMinutes * 60 * 1000;
-      const timeSinceLastTrigger = Date.now() - alert.lastTriggeredAt.getTime();
+      const timeSinceLastTrigger = Date.now() - alert.triggeredAt.getTime();
       if (timeSinceLastTrigger < cooldownMs) {
         return false;
       }
@@ -403,17 +403,17 @@ export class AlertService {
   }
 
   private shouldAlertTrigger(alert: PriceAlert, currentPrice: number): boolean {
-    switch (alert.alertType) {
-      case AlertType.ABOVE:
+    switch (alert.type) {
+      case PRICE_ABOVE:
         return currentPrice >= Number(alert.targetPrice);
 
-      case AlertType.BELOW:
+      case PRICE_BELOW:
         return currentPrice <= Number(alert.targetPrice);
 
-      case AlertType.PERCENT_CHANGE:
-        const priceAtCreation = Number(alert.priceAtCreation);
-        const percentChange = ((currentPrice - priceAtCreation) / priceAtCreation) * 100;
-        const targetPercent = Number(alert.targetPercentChange);
+      case PRICE_CHANGE_PERCENT:
+        const basePrice = Number(alert.basePrice);
+        const percentChange = ((currentPrice - basePrice) / basePrice) * 100;
+        const targetPercent = Number(alert.percentChange);
 
         if (targetPercent >= 0) {
           return percentChange >= targetPercent;
@@ -464,9 +464,9 @@ export class AlertService {
         tokenSymbol: alert.tokenSymbol,
         tokenLogoURI: alert.tokenLogoURI,
         chainId: alert.chainId,
-        alertType: alert.alertType,
+        type: alert.type,
         targetPrice: alert.targetPrice,
-        targetPercentChange: alert.targetPercentChange,
+        percentChange: alert.percentChange,
         triggeredPrice: new Prisma.Decimal(currentPrice),
         notificationsSent,
       },
@@ -477,7 +477,7 @@ export class AlertService {
       await this.prisma.priceAlert.update({
         where: { id: alert.id },
         data: {
-          lastTriggeredAt: new Date(),
+          triggeredAt: new Date(),
           triggerCount: { increment: 1 },
         },
       });
@@ -487,7 +487,7 @@ export class AlertService {
         where: { id: alert.id },
         data: {
           isEnabled: false,
-          lastTriggeredAt: new Date(),
+          triggeredAt: new Date(),
           triggerCount: { increment: 1 },
         },
       });
@@ -546,14 +546,14 @@ export class AlertService {
     };
   }
 
-  private mapAlertType(type: 'above' | 'below' | 'percent_change'): AlertType {
+  private maptype(type: 'above' | 'below' | 'percent_change'): type {
     switch (type) {
       case 'above':
-        return AlertType.ABOVE;
+        return PRICE_ABOVE;
       case 'below':
-        return AlertType.BELOW;
+        return PRICE_BELOW;
       case 'percent_change':
-        return AlertType.PERCENT_CHANGE;
+        return PRICE_CHANGE_PERCENT;
     }
   }
 

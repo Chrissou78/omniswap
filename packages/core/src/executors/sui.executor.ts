@@ -1,18 +1,16 @@
 // packages/core/src/executors/sui.executor.ts
 
-import { SuiClient, getFullnodeUrl } from '@mysten/sui.js/client';
-import { TransactionBlock } from '@mysten/sui/transactions';
+import { SuiClient, getFullnodeUrl } from '@mysten/sui/client';
 import {
   BaseExecutor,
   ExecutionContext,
   ExecutionResult,
   TransactionStatus,
 } from './base.executor';
-import { ethers } from 'ethers';
 
 export class SuiExecutor extends BaseExecutor {
   readonly chainType = 'SUI' as const;
-  readonly supportedChains = ['sui'];
+  readonly supportedChains = ['sui', '784'];
 
   private client: SuiClient;
 
@@ -31,7 +29,6 @@ export class SuiExecutor extends BaseExecutor {
   }> {
     const { step } = context;
 
-    // Cetus returns base64 encoded transaction bytes
     if (!step.txData) {
       throw new Error('Transaction data not available');
     }
@@ -45,19 +42,19 @@ export class SuiExecutor extends BaseExecutor {
   }
 
   async executeTransaction(context: ExecutionContext): Promise<ExecutionResult> {
-    const { signedTransaction } = context;
+    const { signedTransaction, signature } = context;
 
-    if (!signedTransaction) {
+    if (!signedTransaction || !signature) {
       return {
         success: false,
-        error: 'No signed transaction provided',
+        error: 'No signed transaction or signature provided',
       };
     }
 
     try {
-      // Execute the signed transaction
       const result = await this.client.executeTransactionBlock({
         transactionBlock: signedTransaction,
+        signature: signature,
         options: {
           showEffects: true,
           showEvents: true,
@@ -66,9 +63,8 @@ export class SuiExecutor extends BaseExecutor {
 
       console.log(`[Sui] Transaction executed: ${result.digest}`);
 
-      // Check if transaction was successful
       const status = result.effects?.status;
-      
+
       if (status?.status === 'failure') {
         return {
           success: false,
@@ -91,22 +87,15 @@ export class SuiExecutor extends BaseExecutor {
     }
   }
 
-  async getTransactionStatus(
-    chainId: string,
-    txHash: string
-  ): Promise<TransactionStatus> {
+  async getTransactionStatus(chainId: string, txHash: string): Promise<TransactionStatus> {
     try {
       const tx = await this.client.getTransactionBlock({
         digest: txHash,
-        options: {
-          showEffects: true,
-        },
+        options: { showEffects: true },
       });
 
       if (!tx) {
-        return {
-          status: 'PENDING',
-        };
+        return { status: 'PENDING' };
       }
 
       const status = tx.effects?.status;
@@ -128,20 +117,13 @@ export class SuiExecutor extends BaseExecutor {
         };
       }
 
-      return {
-        status: 'PENDING',
-      };
+      return { status: 'PENDING' };
     } catch (error: any) {
-      return {
-        status: 'PENDING',
-        error: error.message,
-      };
+      return { status: 'PENDING', error: error.message };
     }
   }
 
   async estimateGas(context: ExecutionContext): Promise<string> {
-    // Sui uses gas budget
-    // Return a reasonable default
     return '50000000'; // 0.05 SUI
   }
 
@@ -152,7 +134,7 @@ export class SuiExecutor extends BaseExecutor {
     spenderAddress: string
   ): Promise<bigint> {
     // Sui doesn't use allowances
-    return BigInt(ethers.MaxUint256);
+    return BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff');
   }
 
   async buildApprovalTransaction(
@@ -161,28 +143,16 @@ export class SuiExecutor extends BaseExecutor {
     spenderAddress: string,
     amount: string
   ): Promise<null> {
-    // Sui doesn't need approvals
     return null;
   }
 
-  /**
-   * Get SUI balance
-   */
   async getBalance(address: string): Promise<bigint> {
-    const balance = await this.client.getBalance({
-      owner: address,
-    });
+    const balance = await this.client.getBalance({ owner: address });
     return BigInt(balance.totalBalance);
   }
 
-  /**
-   * Get coin balance for a specific type
-   */
   async getCoinBalance(address: string, coinType: string): Promise<bigint> {
-    const balance = await this.client.getBalance({
-      owner: address,
-      coinType,
-    });
+    const balance = await this.client.getBalance({ owner: address, coinType });
     return BigInt(balance.totalBalance);
   }
 }

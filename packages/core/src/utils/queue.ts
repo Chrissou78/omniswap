@@ -1,7 +1,6 @@
-// apps/api/src/utils/queue.ts
+// packages/core/src/utils/queue.ts
 
-import { Queue, Worker, Job, QueueEvents } from 'bullmq';
-import { RedisClient } from './redis';
+import { Queue, Worker, Job } from 'bullmq';
 
 export interface QueueConfig {
   redis: {
@@ -19,7 +18,6 @@ export interface QueueConfig {
   };
 }
 
-// Job Types
 export interface SwapJob {
   swapId: string;
   quoteId: string;
@@ -45,33 +43,26 @@ export interface WebhookJob {
   webhookId: string;
   url: string;
   event: string;
-  payload: any;
+  payload: unknown;
   attempt: number;
 }
 
-// Queue Manager
 export class QueueManager {
-  private queues: Map<string, Queue> = new Map();
-  private workers: Map<string, Worker> = new Map();
+  private queues: Map<string, Queue<unknown, unknown, string>> = new Map();
+  private workers: Map<string, Worker<unknown, unknown, string>> = new Map();
   private config: QueueConfig;
 
   constructor(config: QueueConfig) {
     this.config = config;
   }
 
-  /**
-   * Create or get a queue
-   */
-  getQueue<T = any>(name: string): Queue<T> {
+  getQueue(name: string): Queue<unknown, unknown, string> {
     if (!this.queues.has(name)) {
-      const queue = new Queue<T>(name, {
+      const queue = new Queue(name, {
         connection: this.config.redis,
         defaultJobOptions: {
           attempts: 3,
-          backoff: {
-            type: 'exponential',
-            delay: 1000,
-          },
+          backoff: { type: 'exponential', delay: 1000 },
           removeOnComplete: 100,
           removeOnFail: 50,
           ...this.config.defaultJobOptions,
@@ -79,30 +70,20 @@ export class QueueManager {
       });
       this.queues.set(name, queue);
     }
-    return this.queues.get(name) as Queue<T>;
+    return this.queues.get(name)!;
   }
 
-  /**
-   * Create a worker for a queue
-   */
-  createWorker<T = any>(
+  createWorker(
     queueName: string,
-    processor: (job: Job<T>) => Promise<any>,
-    options?: {
-      concurrency?: number;
-      limiter?: {
-        max: number;
-        duration: number;
-      };
-    }
-  ): Worker<T> {
-    const worker = new Worker<T>(queueName, processor, {
+    processor: (job: Job) => Promise<unknown>,
+    options?: { concurrency?: number; limiter?: { max: number; duration: number } }
+  ): Worker {
+    const worker = new Worker(queueName, processor, {
       connection: this.config.redis,
       concurrency: options?.concurrency || 5,
       limiter: options?.limiter,
     });
 
-    // Event handlers
     worker.on('completed', (job) => {
       console.log(`[${queueName}] Job ${job.id} completed`);
     });
@@ -119,9 +100,6 @@ export class QueueManager {
     return worker;
   }
 
-  /**
-   * Add a job to a queue
-   */
   async addJob<T>(
     queueName: string,
     data: T,
@@ -129,27 +107,18 @@ export class QueueManager {
       jobId?: string;
       delay?: number;
       priority?: number;
-      repeat?: {
-        pattern?: string;
-        every?: number;
-      };
+      repeat?: { pattern?: string; every?: number };
     }
-  ): Promise<Job<T>> {
-    const queue = this.getQueue<T>(queueName);
-    return queue.add(queueName, data, options);
+  ): Promise<Job> {
+    const queue = this.getQueue(queueName);
+    return queue.add(queueName, data as unknown, options);
   }
 
-  /**
-   * Get job by ID
-   */
-  async getJob<T>(queueName: string, jobId: string): Promise<Job<T> | undefined> {
-    const queue = this.getQueue<T>(queueName);
+  async getJob(queueName: string, jobId: string): Promise<Job | undefined> {
+    const queue = this.getQueue(queueName);
     return queue.getJob(jobId);
   }
 
-  /**
-   * Close all queues and workers
-   */
   async close(): Promise<void> {
     for (const worker of this.workers.values()) {
       await worker.close();
@@ -160,7 +129,6 @@ export class QueueManager {
   }
 }
 
-// Queue Names
 export const QUEUES = {
   SWAP_EXECUTION: 'swap-execution',
   TRANSACTION_MONITOR: 'transaction-monitor',

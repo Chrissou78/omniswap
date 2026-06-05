@@ -26,7 +26,7 @@ export interface PortfolioHolding {
   unrealizedPnl: number;
   unrealizedPnlPercent: number;
   allocation: number;
-  logoURI?: string;
+  logoUrl?: string;
 }
 
 export interface AllocationItem {
@@ -287,7 +287,7 @@ export class PortfolioService {
       where: {
         portfolioId_chainId_tokenAddress: {
           portfolioId: portfolio.id,
-          chainId: swap.toChainId,
+          chainId: swap.outputChainId,
           tokenAddress: swap.toTokenAddress.toLowerCase(),
         },
       },
@@ -317,7 +317,7 @@ export class PortfolioService {
       await prisma.portfolioHolding.create({
         data: {
           portfolioId: portfolio.id,
-          chainId: swap.toChainId,
+          chainId: swap.outputChainId,
           tokenAddress: swap.toTokenAddress.toLowerCase(),
           tokenSymbol: swap.toTokenSymbol,
           tokenName: swap.toTokenName,
@@ -377,7 +377,7 @@ export class PortfolioService {
         unrealizedPnl,
         unrealizedPnlPercent,
         allocation: 0, // Calculated later
-        logoURI: token?.logoURI,
+        logoUrl: token?.logoURI,
       });
     }
 

@@ -18,9 +18,7 @@ export async function GET(
     const booking = await prisma.adBooking.findUnique({
       where: { id },
       include: {
-        advertiser: true,
         slot: true,
-        payments: true,
       },
     });
 
@@ -49,15 +47,16 @@ export async function PATCH(
   try {
     const data = await request.json();
 
-    const updateData: any = {};
+    const updateData: Record<string, unknown> = {};
 
     if (data.status === 'APPROVED') {
       updateData.status = 'APPROVED';
       updateData.approvedAt = new Date();
+      updateData.approvedBy = admin.id;
     } else if (data.status === 'REJECTED') {
       updateData.status = 'REJECTED';
       updateData.rejectedAt = new Date();
-      updateData.rejectionReason = data.rejectionReason || null;
+      updateData.rejectedReason = data.rejectionReason || null;
     } else if (data.status === 'ACTIVE') {
       updateData.status = 'ACTIVE';
     } else if (data.status) {
@@ -67,16 +66,6 @@ export async function PATCH(
     const booking = await prisma.adBooking.update({
       where: { id },
       data: updateData,
-    });
-
-    await prisma.auditLog.create({
-      data: {
-        adminId: admin.id,
-        action: 'UPDATE',
-        entity: 'AdBooking',
-        entityId: booking.id,
-        details: data,
-      },
     });
 
     return NextResponse.json(booking);

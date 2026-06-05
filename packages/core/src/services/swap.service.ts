@@ -1,13 +1,13 @@
-import { PrismaClient, Prisma, SwapStatus } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 import { Redis } from 'ioredis';
 import { ethers } from 'ethers';
 import { logger } from '../utils/logger';
 import { QuoteService, Quote, SwapRoute } from './quote.service';
 import { WalletService, EVMWalletService, SolanaWalletService, SuiWalletService } from './wallet.service';
-import { OneInchAdapter } from '../adapters/oneinch.adapter';
-import { JupiterAdapter } from '../adapters/jupiter.adapter';
-import { CetusAdapter } from '../adapters/cetus.adapter';
-import { LiFiAdapter } from '../adapters/lifi.adapter';
+import { OneInchAdapter } from '../adapters/evm/oneinch.adapter';
+import { JupiterAdapter } from '../adapters/solana/jupiter.adapter';
+import { CetusAdapter } from '../adapters/sui/cetus.adapter';
+import { LiFiAdapter } from '../adapters/evm/lifi.adapter';
 
 // ============================================================================
 // Types
@@ -28,7 +28,7 @@ export interface SwapResult {
   chainId: number;
   inputAmount: string;
   outputAmount: string;
-  actualOutputAmount?: string;
+  actualOutput?: string;
   platformFee: string;
   gasFee?: string;
   blockNumber?: number;
@@ -123,7 +123,7 @@ export class SwapService {
       throw new Error('Invalid route index');
     }
 
-    const chainType = this.walletService.getChainType(quote.inputChainId);
+    const chainType = this.walletService.getChainType(quote.fromChainId);
     let result: BuildSwapResult;
 
     switch (route.source) {
@@ -153,7 +153,7 @@ export class SwapService {
   ): Promise<BuildSwapResult> {
     // Check if approval is needed
     const evmService = this.walletService.getEVMService();
-    const spenderAddress = await this.oneInchAdapter.getSpenderAddress(quote.inputChainId);
+    const spenderAddress = await this.oneInchAdapter.getSpenderAddress(quote.fromChainId);
     
     if (!spenderAddress) {
       throw new Error('Failed to get 1inch spender address');
@@ -163,12 +163,12 @@ export class SwapService {
     let approvalTransaction: SwapTransaction | undefined;
 
     // Check allowance (skip for native token)
-    const isNativeToken = quote.inputTokenAddress.toLowerCase() === '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
+    const isNativeToken = quote.fromTokenAddress.toLowerCase() === '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
     
     if (!isNativeToken) {
       const allowance = await evmService.checkAllowance(
-        quote.inputChainId,
-        quote.inputTokenAddress,
+        quote.fromChainId,
+        quote.fromTokenAddress,
         userAddress,
         spenderAddress
       );
@@ -176,14 +176,14 @@ export class SwapService {
       if (parseFloat(allowance) < parseFloat(quote.inputAmount)) {
         approvalRequired = true;
         const approvalData = await this.oneInchAdapter.getApproveCalldata(
-          quote.inputChainId,
-          quote.inputTokenAddress,
+          quote.fromChainId,
+          quote.fromTokenAddress,
           ethers.MaxUint256.toString()
         );
 
         if (approvalData) {
           approvalTransaction = {
-            chainId: quote.inputChainId,
+            chainId: quote.fromChainId,
             chainType: 'evm',
             to: approvalData.to,
             data: approvalData.data,
@@ -195,11 +195,11 @@ export class SwapService {
 
     // Get swap transaction
     const swapData = await this.oneInchAdapter.getSwapData({
-      chainId: quote.inputChainId,
-      fromTokenAddress: quote.inputTokenAddress,
-      toTokenAddress: quote.outputTokenAddress,
+      chainId: quote.fromChainId,
+      fromTokenAddress: quote.fromTokenAddress,
+      toTokenAddress: quote.toTokenAddress,
       amount: this.toWei(quote.inputAmount, 18), // Adjust decimals as needed
-      slippage: quote.slippageBps / 100,
+      slippage: quote.slippage / 100,
       fromAddress: userAddress,
     });
 
@@ -209,7 +209,7 @@ export class SwapService {
 
     return {
       transaction: {
-        chainId: quote.inputChainId,
+        chainId: quote.fromChainId,
         chainType: 'evm',
         to: swapData.tx.to,
         data: swapData.tx.data,
@@ -266,7 +266,7 @@ export class SwapService {
     const txData = await this.cetusAdapter.buildSwapTransaction({
       quote: cetusQuote,
       senderAddress: userAddress,
-      slippageBps: quote.slippageBps,
+      slippage: quote.slippage,
     });
 
     if (!txData) {
@@ -315,11 +315,11 @@ export class SwapService {
     let approvalRequired = false;
     let approvalTransaction: SwapTransaction | undefined;
 
-    if (step.estimate?.approvalAddress && quote.inputChainId !== 101 && quote.inputChainId !== 784) {
+    if (step.estimate?.approvalAddress && quote.fromChainId !== 101 && quote.fromChainId !== 784) {
       const evmService = this.walletService.getEVMService();
       const allowance = await evmService.checkAllowance(
-        quote.inputChainId,
-        quote.inputTokenAddress,
+        quote.fromChainId,
+        quote.fromTokenAddress,
         userAddress,
         step.estimate.approvalAddress
       );
@@ -328,15 +328,15 @@ export class SwapService {
         approvalRequired = true;
         const approvalTx = await evmService.buildApprovalTransaction({
           chainType: 'evm',
-          chainId: quote.inputChainId,
-          tokenAddress: quote.inputTokenAddress,
+          chainId: quote.fromChainId,
+          tokenAddress: quote.fromTokenAddress,
           spenderAddress: step.estimate.approvalAddress,
           amount: ethers.MaxUint256.toString(),
           ownerAddress: userAddress,
         });
 
         approvalTransaction = {
-          chainId: quote.inputChainId,
+          chainId: quote.fromChainId,
           chainType: 'evm',
           to: approvalTx.to,
           data: approvalTx.data,
@@ -385,16 +385,16 @@ export class SwapService {
         userId,
         quoteId,
         status: 'PENDING',
-        inputChainId: quote.inputChainId,
-        inputTokenAddress: quote.inputTokenAddress,
-        inputTokenSymbol: quote.inputTokenSymbol,
+        fromChainId: quote.fromChainId,
+        fromTokenAddress: quote.fromTokenAddress,
+        fromTokenSymbol: quote.fromTokenSymbol,
         inputAmount: new Prisma.Decimal(quote.inputAmount),
-        outputChainId: quote.outputChainId,
-        outputTokenAddress: quote.outputTokenAddress,
-        outputTokenSymbol: quote.outputTokenSymbol,
-        expectedOutputAmount: new Prisma.Decimal(route.outputAmount),
-        slippageBps: quote.slippageBps,
-        platformFeeBps: this.PLATFORM_FEE_BPS,
+        toChainId: quote.toChainId,
+        toTokenAddress: quote.toTokenAddress,
+        toTokenSymbol: quote.toTokenSymbol,
+        expectedOutput: new Prisma.Decimal(route.outputAmount),
+        slippage: quote.slippage,
+        platformFeeUsd: this.PLATFORM_FEE_BPS,
         routeSource: route.source,
         routeData: route.routeData,
       },
@@ -409,12 +409,12 @@ export class SwapService {
 
     try {
       let txHash: string;
-      const chainType = this.walletService.getChainType(quote.inputChainId);
+      const chainType = this.walletService.getChainType(quote.fromChainId);
 
       if (signedTransaction) {
         // User has pre-signed the transaction
         txHash = await this.broadcastTransaction(
-          quote.inputChainId,
+          quote.fromChainId,
           chainType,
           signedTransaction
         );
@@ -432,17 +432,17 @@ export class SwapService {
       });
 
       // Start monitoring transaction
-      this.monitorTransaction(swap.id, quote.inputChainId, txHash, chainType);
+      this.monitorTransaction(swap.id, quote.fromChainId, txHash, chainType);
 
       return {
         swapId: swap.id,
         status: 'pending',
         txHash,
-        chainId: quote.inputChainId,
+        chainId: quote.fromChainId,
         inputAmount: quote.inputAmount,
         outputAmount: route.outputAmount,
         platformFee: this.calculatePlatformFee(quote.inputAmount),
-        explorerUrl: `${this.EXPLORER_URLS[quote.inputChainId]}${txHash}`,
+        explorerUrl: `${this.EXPLORER_URLS[quote.fromChainId]}${txHash}`,
       };
     } catch (error) {
       // Update swap as failed
@@ -450,7 +450,7 @@ export class SwapService {
         where: { id: swap.id },
         data: {
           status: 'FAILED',
-          errorMessage: (error as Error).message,
+          error: (error as Error).message,
         },
       });
 
@@ -547,7 +547,7 @@ export class SwapService {
               blockNumber: blockNumber ? BigInt(blockNumber) : undefined,
               gasUsed: gasUsed ? new Prisma.Decimal(gasUsed) : undefined,
               confirmedAt: new Date(),
-              errorMessage: success ? undefined : 'Transaction reverted',
+              error: success ? undefined : 'Transaction reverted',
             },
           });
 
@@ -576,7 +576,7 @@ export class SwapService {
           where: { id: swapId },
           data: {
             status: 'FAILED',
-            errorMessage: 'Transaction confirmation timeout',
+            error: 'Transaction confirmation timeout',
           },
         });
 
@@ -605,15 +605,15 @@ export class SwapService {
       txHash: swap.txHash || '',
       chainId: swap.inputChainId,
       inputAmount: swap.inputAmount.toString(),
-      outputAmount: swap.expectedOutputAmount?.toString() || '0',
-      actualOutputAmount: swap.actualOutputAmount?.toString(),
-      platformFee: swap.platformFeeAmount?.toString() || '0',
+      outputAmount: swap.expectedOutput?.toString() || '0',
+      actualOutput: swap.actualOutput?.toString(),
+      platformFee: swap.platformFee?.toString() || '0',
       gasFee: swap.gasUsed?.toString(),
       blockNumber: swap.blockNumber ? Number(swap.blockNumber) : undefined,
       explorerUrl: swap.txHash
         ? `${this.EXPLORER_URLS[swap.inputChainId]}${swap.txHash}`
         : '',
-      error: swap.errorMessage || undefined,
+      error: swap.error || undefined,
     };
   }
 
@@ -630,8 +630,8 @@ export class SwapService {
 
     if (filters?.chainId) {
       where.OR = [
-        { inputChainId: filters.chainId },
-        { outputChainId: filters.chainId },
+        { fromChainId: filters.chainId },
+        { toChainId: filters.chainId },
       ];
     }
     if (filters?.status) {
@@ -655,9 +655,9 @@ export class SwapService {
         txHash: swap.txHash || '',
         chainId: swap.inputChainId,
         inputAmount: swap.inputAmount.toString(),
-        outputAmount: swap.expectedOutputAmount?.toString() || '0',
-        actualOutputAmount: swap.actualOutputAmount?.toString(),
-        platformFee: swap.platformFeeAmount?.toString() || '0',
+        outputAmount: swap.expectedOutput?.toString() || '0',
+        actualOutput: swap.actualOutput?.toString(),
+        platformFee: swap.platformFee?.toString() || '0',
         gasFee: swap.gasUsed?.toString(),
         blockNumber: swap.blockNumber ? Number(swap.blockNumber) : undefined,
         explorerUrl: swap.txHash

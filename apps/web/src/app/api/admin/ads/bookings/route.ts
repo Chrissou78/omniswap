@@ -17,9 +17,7 @@ export async function GET(request: NextRequest) {
       where: status ? { status: status as any } : undefined,
       orderBy: { createdAt: 'desc' },
       include: {
-        advertiser: { select: { walletAddress: true, companyName: true } },
         slot: { select: { name: true, position: true } },
-        payments: { select: { status: true, amountUsd: true, txHash: true } },
       },
     });
 

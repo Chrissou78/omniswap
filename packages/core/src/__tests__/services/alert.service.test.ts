@@ -50,7 +50,7 @@ describe('AlertService', () => {
         tokenSymbol: 'TEST',
         tokenName: 'Test Token',
         chainId: 1,
-        alertType: 'above',
+        type: 'above',
         targetPrice: 150,
         notifyEmail: true,
         notifyPush: true,
@@ -63,7 +63,7 @@ describe('AlertService', () => {
       expect(prismaMock.priceAlert.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           userId: 'user_test123',
-          alertType: 'ABOVE',
+          type: 'ABOVE',
           targetPrice: expect.any(Prisma.Decimal),
         }),
       });
@@ -71,7 +71,7 @@ describe('AlertService', () => {
     });
 
     it('should create a price below alert successfully', async () => {
-      const mockAlert = createMockPriceAlert({ alertType: 'BELOW', targetPrice: new Prisma.Decimal(80) });
+      const mockAlert = createMockPriceAlert({ type: 'BELOW', targetPrice: new Prisma.Decimal(80) });
       
       mockPriceService.getTokenPrice.mockResolvedValue(100);
       prismaMock.priceAlert.findFirst.mockResolvedValue(null);
@@ -86,7 +86,7 @@ describe('AlertService', () => {
         tokenSymbol: 'TEST',
         tokenName: 'Test Token',
         chainId: 1,
-        alertType: 'below',
+        type: 'below',
         targetPrice: 80,
         notifyEmail: true,
         notifyPush: false,
@@ -97,16 +97,16 @@ describe('AlertService', () => {
 
       expect(prismaMock.priceAlert.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
-          alertType: 'BELOW',
+          type: 'BELOW',
         }),
       });
     });
 
     it('should create a percent change alert successfully', async () => {
       const mockAlert = createMockPriceAlert({
-        alertType: 'PERCENT_CHANGE',
+        type: 'PERCENT_CHANGE',
         targetPrice: null,
-        targetPercentChange: new Prisma.Decimal(10),
+        percentChange: new Prisma.Decimal(10),
       });
       
       mockPriceService.getTokenPrice.mockResolvedValue(100);
@@ -122,8 +122,8 @@ describe('AlertService', () => {
         tokenSymbol: 'TEST',
         tokenName: 'Test Token',
         chainId: 1,
-        alertType: 'percent_change',
-        targetPercentChange: 10,
+        type: 'percent_change',
+        percentChange: 10,
         notifyEmail: true,
         notifyPush: true,
         notifyTelegram: false,
@@ -133,8 +133,8 @@ describe('AlertService', () => {
 
       expect(prismaMock.priceAlert.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
-          alertType: 'PERCENT_CHANGE',
-          targetPercentChange: expect.any(Prisma.Decimal),
+          type: 'PERCENT_CHANGE',
+          percentChange: expect.any(Prisma.Decimal),
         }),
       });
     });
@@ -149,7 +149,7 @@ describe('AlertService', () => {
           tokenSymbol: 'TEST',
           tokenName: 'Test Token',
           chainId: 1,
-          alertType: 'above',
+          type: 'above',
           targetPrice: 150,
           notifyEmail: true,
           notifyPush: true,
@@ -171,7 +171,7 @@ describe('AlertService', () => {
           tokenSymbol: 'TEST',
           tokenName: 'Test Token',
           chainId: 1,
-          alertType: 'above',
+          type: 'above',
           targetPrice: 150,
           notifyEmail: true,
           notifyPush: true,
@@ -182,7 +182,7 @@ describe('AlertService', () => {
       ).rejects.toThrow('A similar alert already exists');
     });
 
-    it('should throw error if percent_change alert missing targetPercentChange', async () => {
+    it('should throw error if percent_change alert missing percentChange', async () => {
       mockPriceService.getTokenPrice.mockResolvedValue(100);
 
       await expect(
@@ -192,14 +192,14 @@ describe('AlertService', () => {
           tokenSymbol: 'TEST',
           tokenName: 'Test Token',
           chainId: 1,
-          alertType: 'percent_change',
+          type: 'percent_change',
           notifyEmail: true,
           notifyPush: true,
           notifyTelegram: false,
           isRecurring: false,
           cooldownMinutes: 0,
         })
-      ).rejects.toThrow('targetPercentChange is required');
+      ).rejects.toThrow('percentChange is required');
     });
   });
 
@@ -346,7 +346,7 @@ describe('AlertService', () => {
   describe('checkAlert', () => {
     it('should trigger alert when price goes above target', async () => {
       const mockAlert = createMockPriceAlert({
-        alertType: 'ABOVE',
+        type: 'ABOVE',
         targetPrice: new Prisma.Decimal(150),
         isEnabled: true,
       });
@@ -370,7 +370,7 @@ describe('AlertService', () => {
 
     it('should trigger alert when price goes below target', async () => {
       const mockAlert = createMockPriceAlert({
-        alertType: 'BELOW',
+        type: 'BELOW',
         targetPrice: new Prisma.Decimal(80),
         isEnabled: true,
       });
@@ -391,7 +391,7 @@ describe('AlertService', () => {
 
     it('should not trigger alert when price does not meet condition', async () => {
       const mockAlert = createMockPriceAlert({
-        alertType: 'ABOVE',
+        type: 'ABOVE',
         targetPrice: new Prisma.Decimal(150),
         isEnabled: true,
       });
@@ -411,12 +411,12 @@ describe('AlertService', () => {
 
     it('should respect cooldown for recurring alerts', async () => {
       const mockAlert = createMockPriceAlert({
-        alertType: 'ABOVE',
+        type: 'ABOVE',
         targetPrice: new Prisma.Decimal(150),
         isEnabled: true,
         isRecurring: true,
         cooldownMinutes: 60,
-        lastTriggeredAt: new Date(), // Just triggered
+        triggeredAt: new Date(), // Just triggered
       });
 
       prismaMock.priceAlert.findUnique.mockResolvedValue({
@@ -449,7 +449,7 @@ describe('AlertService', () => {
 
     it('should disable non-recurring alert after trigger', async () => {
       const mockAlert = createMockPriceAlert({
-        alertType: 'ABOVE',
+        type: 'ABOVE',
         targetPrice: new Prisma.Decimal(150),
         isEnabled: true,
         isRecurring: false,

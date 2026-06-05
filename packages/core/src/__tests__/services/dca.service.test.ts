@@ -55,14 +55,14 @@ describe('DCAService', () => {
 
       const result = await dcaService.createStrategy({
         userId: 'user_test123',
-        inputTokenAddress: '0xusdc123',
-        inputTokenSymbol: 'USDC',
+        fromTokenAddress: '0xusdc123',
+        fromTokenSymbol: 'USDC',
         inputTokenDecimals: 6,
-        inputChainId: 1,
-        outputTokenAddress: '0xeth123',
-        outputTokenSymbol: 'ETH',
+        fromChainId: 1,
+        toTokenAddress: '0xeth123',
+        toTokenSymbol: 'ETH',
         outputTokenDecimals: 18,
-        outputChainId: 1,
+        toChainId: 1,
         amountPerExecution: '100',
         frequency: 'daily',
         totalExecutions: 30,
@@ -88,24 +88,24 @@ describe('DCAService', () => {
 
       await dcaService.createStrategy({
         userId: 'user_test123',
-        inputTokenAddress: '0xusdc123',
-        inputTokenSymbol: 'USDC',
+        fromTokenAddress: '0xusdc123',
+        fromTokenSymbol: 'USDC',
         inputTokenDecimals: 6,
-        inputChainId: 1,
-        outputTokenAddress: '0xeth123',
-        outputTokenSymbol: 'ETH',
+        fromChainId: 1,
+        toTokenAddress: '0xeth123',
+        toTokenSymbol: 'ETH',
         outputTokenDecimals: 18,
-        outputChainId: 1,
+        toChainId: 1,
         amountPerExecution: '100',
         frequency: 'custom',
-        customIntervalMs: 43200000, // 12 hours
+        customIntervalHours: 43200000, // 12 hours
         totalExecutions: 60,
       });
 
       expect(prismaMock.dCAStrategy.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           frequency: DCAFrequency.CUSTOM,
-          customIntervalMs: BigInt(43200000),
+          customIntervalHours: BigInt(43200000),
         }),
       });
     });
@@ -114,33 +114,33 @@ describe('DCAService', () => {
       await expect(
         dcaService.createStrategy({
           userId: 'user_test123',
-          inputTokenAddress: '0xusdc123',
-          inputTokenSymbol: 'USDC',
+          fromTokenAddress: '0xusdc123',
+          fromTokenSymbol: 'USDC',
           inputTokenDecimals: 6,
-          inputChainId: 1,
-          outputTokenAddress: '0xeth123',
-          outputTokenSymbol: 'ETH',
+          fromChainId: 1,
+          toTokenAddress: '0xeth123',
+          toTokenSymbol: 'ETH',
           outputTokenDecimals: 18,
-          outputChainId: 1,
+          toChainId: 1,
           amountPerExecution: '100',
           frequency: 'custom',
           totalExecutions: 30,
         })
-      ).rejects.toThrow('customIntervalMs required for custom frequency');
+      ).rejects.toThrow('customIntervalHours required for custom frequency');
     });
 
     it('should throw error for invalid totalExecutions', async () => {
       await expect(
         dcaService.createStrategy({
           userId: 'user_test123',
-          inputTokenAddress: '0xusdc123',
-          inputTokenSymbol: 'USDC',
+          fromTokenAddress: '0xusdc123',
+          fromTokenSymbol: 'USDC',
           inputTokenDecimals: 6,
-          inputChainId: 1,
-          outputTokenAddress: '0xeth123',
-          outputTokenSymbol: 'ETH',
+          fromChainId: 1,
+          toTokenAddress: '0xeth123',
+          toTokenSymbol: 'ETH',
           outputTokenDecimals: 18,
-          outputChainId: 1,
+          toChainId: 1,
           amountPerExecution: '100',
           frequency: 'daily',
           totalExecutions: 1, // Must be at least 2
@@ -159,14 +159,14 @@ describe('DCAService', () => {
 
       await dcaService.createStrategy({
         userId: 'user_test123',
-        inputTokenAddress: '0xusdc123',
-        inputTokenSymbol: 'USDC',
+        fromTokenAddress: '0xusdc123',
+        fromTokenSymbol: 'USDC',
         inputTokenDecimals: 6,
-        inputChainId: 1,
-        outputTokenAddress: '0xeth123',
-        outputTokenSymbol: 'ETH',
+        fromChainId: 1,
+        toTokenAddress: '0xeth123',
+        toTokenSymbol: 'ETH',
         outputTokenDecimals: 18,
-        outputChainId: 1,
+        toChainId: 1,
         amountPerExecution: '100',
         frequency: 'daily',
         totalExecutions: 30,
@@ -337,7 +337,7 @@ describe('DCAService', () => {
         expect.objectContaining({
           data: expect.objectContaining({
             status: DCAExecutionStatus.SKIPPED,
-            errorMessage: 'Gas price too high',
+            error: 'Gas price too high',
           }),
         })
       );
@@ -345,7 +345,7 @@ describe('DCAService', () => {
 
     it('should skip execution when price impact is too high', async () => {
       const mockStrategy = createMockDCAStrategy({
-        maxPriceImpactBps: 300, // 3%
+        maxPriceImpact: 300, // 3%
       });
       const mockExecution = createMockDCAExecution({ status: 'PENDING' });
 
@@ -367,7 +367,7 @@ describe('DCAService', () => {
         expect.objectContaining({
           data: expect.objectContaining({
             status: DCAExecutionStatus.SKIPPED,
-            errorMessage: expect.stringContaining('Price impact too high'),
+            error: expect.stringContaining('Price impact too high'),
           }),
         })
       );
@@ -386,7 +386,7 @@ describe('DCAService', () => {
     it('should mark strategy as completed after final execution', async () => {
       const mockStrategy = createMockDCAStrategy({
         totalExecutions: 30,
-        executionsCompleted: 29,
+        executedCount: 29,
       });
       const mockExecution = createMockDCAExecution({ executionNumber: 30 });
 
@@ -438,7 +438,7 @@ describe('DCAService', () => {
       } as any);
       prismaMock.dCAStrategy.update.mockResolvedValue({
         ...mockStrategy,
-        status: DCAStatus.FAILED,
+        status: DCAStatus.CANCELLED,
       } as any);
 
       mockQuoteService.getQuote.mockRejectedValue(new Error('No route available'));
@@ -448,7 +448,7 @@ describe('DCAService', () => {
       expect(prismaMock.dCAStrategy.update).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            status: DCAStatus.FAILED,
+            status: DCAStatus.CANCELLED,
           }),
         })
       );
@@ -487,8 +487,8 @@ describe('DCAService', () => {
 
       prismaMock.dCAStrategy.aggregate.mockResolvedValue({
         _sum: {
-          totalInputSpent: new Prisma.Decimal(5000),
-          totalOutputReceived: new Prisma.Decimal(2.5),
+          totalInputAmount: new Prisma.Decimal(5000),
+          totalOutputAmount: new Prisma.Decimal(2.5),
           totalPlatformFees: new Prisma.Decimal(20),
           totalGasFees: new Prisma.Decimal(5),
         },
