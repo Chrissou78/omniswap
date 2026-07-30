@@ -53,7 +53,7 @@ export function findChainByNameOrSymbol(nameOrSymbol: string): Chain | undefined
  */
 export function getTrustWalletIdForChain(chainId: string | number): string | undefined {
   const chain = getChainById(chainId);
-  return chain?.trustwalletId;
+  return chain?.trustwalletId ?? undefined;
 }
 
 /**
@@ -61,7 +61,7 @@ export function getTrustWalletIdForChain(chainId: string | number): string | und
  */
 export function findTrustWalletId(nameOrSymbol: string): string | undefined {
   const chain = findChainByNameOrSymbol(nameOrSymbol);
-  return chain?.trustwalletId;
+  return chain?.trustwalletId ?? undefined;
 }
 
 // ============================================================================
@@ -197,7 +197,12 @@ export function getChainLogo(chainId: string | number): string {
   return '/images/chains/unknown.png';
 }
 
-export function getTokenLogo(token: Token): string {
+export function getTokenLogo(token: {
+  chainId: number | string;
+  address: string;
+  logoURI?: string | null;
+  tags?: string[];
+}): string {
   const tokenKey = `${token.chainId}:${token.address.toLowerCase()}`;
   
   // Priority 1: Explicit logo in logos.json

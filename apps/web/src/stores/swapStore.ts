@@ -75,7 +75,7 @@ export const useSwapStore = create<SwapState>((set, get) => ({
       outputToken: inputToken,
       inputChainId: outputChainId,
       outputChainId: inputChainId,
-      inputAmount: selectedRoute?.estimatedOutput || '',
+      inputAmount: selectedRoute?.expectedOutput || '',
       quote: null,
       selectedRoute: null,
     });
@@ -95,13 +95,13 @@ export const useSwapStore = create<SwapState>((set, get) => ({
 
   // Execute swap
   executeSwap: async (route: Route) => {
-    const { inputAmount, slippage } = get();
-    
+    const { inputAmount, slippage, quote } = get();
+
     set({ isSwapping: true });
 
     try {
       const response = await api.post<Swap>('/api/v1/swap/execute', {
-        quoteId: route.quoteId,
+        quoteId: quote?.id,
         routeId: route.id,
         slippage,
         inputAmount,

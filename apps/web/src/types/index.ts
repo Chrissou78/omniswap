@@ -9,6 +9,31 @@ import type { Chain, Token } from '@omniswap/shared';
 // Re-export for backward compatibility and IDE help
 export type { Chain, Token };
 
+// Re-export API/domain types used by lib/api.ts and stores
+// (explicit exports here shadow the same-named, incompatible ApiResponse from @omniswap/shared)
+export type {
+  ApiResponse,
+  Quote,
+  QuoteRequest,
+  QuoteResponse,
+  Route,
+  RouteStep,
+  Swap,
+} from '@omniswap/types';
+
+// ============================================================================
+// LOGO REGISTRY (matches config/logos.json)
+// ============================================================================
+
+export type LogoEntry = string;
+
+export interface LogosRegistry {
+  version: number;
+  updatedAt: number;
+  chains: Record<string, LogoEntry>;
+  tokens: Record<string, LogoEntry>;
+}
+
 // ============================================================================
 // WEB-SPECIFIC TYPES
 // ============================================================================

@@ -32,7 +32,7 @@ model User {
 }
 
 model Chain {
-  id                     String   @id
+  id                     String   @id @default(cuid())
   chainId                String   @unique
   name                   String
   symbol                 String
@@ -309,11 +309,11 @@ model ConfigVersion {
   chainsUpdatedAt DateTime?
   tokensUpdatedAt DateTime?
   createdAt       DateTime  @default(now())
-  updatedAt       DateTime
+  updatedAt       DateTime @updatedAt
 }
 
 model Notification {
-  id        String   @id
+  id        String   @id @default(cuid())
   userId    String
   type      String
   title     String
@@ -338,25 +338,25 @@ model PlatformSettings {
   tokenListingRequiresApproval Boolean  @default(true)
   acceptedPaymentChains        Json     @default("[]")
   paymentWalletAddress         String?
-  updatedAt                    DateTime
+  updatedAt                    DateTime @updatedAt
 }
 
 model Portfolio {
-  id                String              @id
+  id                String              @id @default(cuid())
   userId            String              @unique
   totalValueUsd     Float               @default(0)
   totalPnlUsd       Float               @default(0)
   totalPnlPercent   Float               @default(0)
   lastUpdatedAt     DateTime            @default(now())
   createdAt         DateTime            @default(now())
-  updatedAt         DateTime
+  updatedAt         DateTime @updatedAt
   User              User                @relation(fields: [userId], references: [id])
   PortfolioHolding  PortfolioHolding[]
   PortfolioSnapshot PortfolioSnapshot[]
 }
 
 model PortfolioHolding {
-  id                   String    @id
+  id                   String    @id @default(cuid())
   portfolioId          String
   chainId              String
   tokenAddress         String
@@ -373,7 +373,7 @@ model PortfolioHolding {
   isHidden             Boolean   @default(false)
   isTracked            Boolean   @default(true)
   createdAt            DateTime  @default(now())
-  updatedAt            DateTime
+  updatedAt            DateTime @updatedAt
   Portfolio            Portfolio @relation(fields: [portfolioId], references: [id])
 
   @@unique([portfolioId, chainId, tokenAddress])
@@ -381,7 +381,7 @@ model PortfolioHolding {
 }
 
 model PortfolioSnapshot {
-  id            String    @id
+  id            String    @id @default(cuid())
   portfolioId   String
   totalValueUsd Float
   totalPnlUsd   Float
@@ -393,7 +393,7 @@ model PortfolioSnapshot {
 }
 
 model Session {
-  id        String   @id
+  id        String   @id @default(cuid())
   userId    String
   token     String   @unique
   userAgent String?
@@ -427,14 +427,14 @@ model SwapStep {
 }
 
 model Tenant {
-  id            String          @id
+  id            String          @id @default(cuid())
   name          String
   slug          String          @unique
   status        String          @default("active")
   plan          String          @default("starter")
   domains       String[]
   createdAt     DateTime        @default(now())
-  updatedAt     DateTime
+  updatedAt     DateTime @updatedAt
   DCAStrategy   DCAStrategy[]
   LimitOrder    LimitOrder[]
   Swap          Swap[]
@@ -446,7 +446,7 @@ model Tenant {
 }
 
 model TenantAdmin {
-  id           String    @id
+  id           String    @id @default(cuid())
   tenantId     String
   email        String
   passwordHash String
@@ -456,14 +456,14 @@ model TenantAdmin {
   mfaSecret    String?
   lastLogin    DateTime?
   createdAt    DateTime  @default(now())
-  updatedAt    DateTime
+  updatedAt    DateTime @updatedAt
   Tenant       Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, email])
 }
 
 model TenantApiKey {
-  id          String    @id
+  id          String    @id @default(cuid())
   tenantId    String
   name        String
   keyHash     String
@@ -485,7 +485,7 @@ model TenantConfig {
   tokens       Json     @default("{}")
   localization Json     @default("{}")
   legal        Json     @default("{}")
-  updatedAt    DateTime
+  updatedAt    DateTime @updatedAt
   Tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 }
 
@@ -523,7 +523,7 @@ model TenantToken {
 }
 
 model TokenListingRequest {
-  id              String               @id
+  id              String               @id @default(cuid())
   userId          String?
   email           String
   telegramHandle  String?
@@ -560,7 +560,7 @@ model TokenListingRequest {
   paidAt          DateTime?
   adminNotes      String?
   createdAt       DateTime             @default(now())
-  updatedAt       DateTime
+  updatedAt       DateTime             @updatedAt
 
   @@unique([chainId, contractAddress])
   @@index([email])
@@ -568,7 +568,7 @@ model TokenListingRequest {
 }
 
 model UserAddress {
-  id        String   @id
+  id        String   @id @default(cuid())
   userId    String
   chainType String
   address   String

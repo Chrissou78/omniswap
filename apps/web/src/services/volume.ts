@@ -1,5 +1,30 @@
 // apps/web/src/services/volume.ts
-import type { SwapTransaction, VolumeStats } from '../types';
+
+export interface SwapTransaction {
+  id: string;
+  timestamp: number;
+  fromChainId: number | string;
+  toChainId: number | string;
+  fromToken: string;
+  toToken: string;
+  fromAmount: string;
+  toAmount: string;
+  fromAmountUsd: number;
+  toAmountUsd: number;
+  userAddress: string;
+  txHash: string;
+  status: string;
+  route: string;
+  platformFeeUsd?: number;
+}
+
+export interface VolumeStats {
+  total: number;
+  last24h: number;
+  last7d: number;
+  last30d: number;
+  transactionCount: number;
+}
 
 const STORAGE_KEY = 'omniswap_transactions';
 const API_ENDPOINT = process.env.NEXT_PUBLIC_API_URL || '';
@@ -146,5 +171,3 @@ export function formatVolume(value: number): string {
   }
   return `$${value.toFixed(2)}`;
 }
-
-export type { SwapTransaction, VolumeStats } from '../types';

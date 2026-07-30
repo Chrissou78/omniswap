@@ -259,12 +259,12 @@ class SwapService {
     const { inputToken, outputToken, inputAmount, chainId, slippage } = params;
 
     // Import price service dynamically to avoid circular deps
-    const { priceService } = await import('@/services/priceService');
+    const priceService = await import('@/services/priceService');
 
     // Get prices for both tokens
     const [inputPrice, outputPrice] = await Promise.all([
-      priceService.getTokenPrice(inputToken, chainId),
-      priceService.getTokenPrice(outputToken, chainId),
+      priceService.getTokenPrice(chainId, inputToken),
+      priceService.getTokenPrice(chainId, outputToken),
     ]);
 
     if (!inputPrice || !outputPrice) {
@@ -272,8 +272,8 @@ class SwapService {
     }
 
     // Calculate output amount
-    const inputValue = parseFloat(inputAmount) * inputPrice;
-    const outputAmount = inputValue / outputPrice;
+    const inputValue = parseFloat(inputAmount) * inputPrice.priceUsd;
+    const outputAmount = inputValue / outputPrice.priceUsd;
     
     // Apply slippage
     const outputWithSlippage = outputAmount * (1 - slippage / 100);

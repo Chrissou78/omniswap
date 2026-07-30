@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { TokenAuditResult, AuditSummary } from '@omniswap/core';
+import { TokenAuditResult, AuditSummary } from '@/services/goPlusService';
 
 interface UseTokenAuditOptions {
   enabled?: boolean;

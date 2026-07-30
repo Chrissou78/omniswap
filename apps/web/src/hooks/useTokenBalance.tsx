@@ -30,9 +30,9 @@ export function useTokenBalance(token: Token | null): TokenBalanceResult {
     token: token?.address === '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE' 
       ? undefined 
       : (token?.address as `0x${string}`),
-    chainId: token?.chainId,
+    chainId: token?.chainId ? Number(token.chainId) : undefined,
     query: {
-      enabled: isConnected && !!token && !!address && token.chainId < 1000,
+      enabled: isConnected && !!token && !!address && Number(token.chainId) < 1000,
     },
   });
 
@@ -44,20 +44,20 @@ export function useTokenBalance(token: Token | null): TokenBalanceResult {
     }
 
     // For EVM chains (chainId < 1000)
-    if (token.chainId < 1000) {
+    if (Number(token.chainId) < 1000) {
       if (evmBalance) {
         setBalance(evmBalance.value.toString());
         setFormatted(evmBalance.formatted);
       }
       setIsLoading(evmLoading);
       setError(evmError);
-    } else if (token.chainId === 101) {
+    } else if (Number(token.chainId) === 101) {
       // Solana - would integrate with @solana/web3.js
       // For now, return placeholder
       setBalance('0');
       setFormatted('0');
       setIsLoading(false);
-    } else if (token.chainId === 784) {
+    } else if (Number(token.chainId) === 784) {
       // Sui - would integrate with @mysten/sui
       // For now, return placeholder
       setBalance('0');
@@ -67,7 +67,7 @@ export function useTokenBalance(token: Token | null): TokenBalanceResult {
   }, [token, isConnected, evmBalance, evmLoading, evmError]);
 
   const refetch = () => {
-    if (token && token.chainId < 1000) {
+    if (token && Number(token.chainId) < 1000) {
       evmRefetch();
     }
   };

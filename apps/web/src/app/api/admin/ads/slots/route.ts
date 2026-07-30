@@ -39,19 +39,10 @@ export async function POST(request: NextRequest) {
         position: data.position,
         width: data.width,
         height: data.height,
-        pricePerDayUsd: data.pricePerDayUsd,
+        dimensions: data.dimensions || `${data.width}x${data.height}`,
+        basePrice: data.basePrice ?? data.pricePerDayUsd,
         description: data.description || null,
         isActive: true,
-      },
-    });
-
-    await prisma.auditLog.create({
-      data: {
-        adminId: admin.id,
-        action: 'CREATE',
-        entity: 'AdSlot',
-        entityId: slot.id,
-        details: { name: slot.name },
       },
     });
 

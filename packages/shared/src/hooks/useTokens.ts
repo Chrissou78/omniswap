@@ -4,13 +4,13 @@ import { Token } from '../types';
 import { ConfigService } from '../configService';
 import { getTokensByChainId as localGetTokensByChainId } from '../index';
 
-interface UseTokensOptions {
+export interface UseTokensOptions {
   chainId: number | string;
   configService?: ConfigService;
   enabled?: boolean;
 }
 
-interface UseTokensResult {
+export interface UseTokensResult {
   tokens: Token[];
   isLoading: boolean;
   error: Error | null;

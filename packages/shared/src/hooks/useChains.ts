@@ -4,12 +4,12 @@ import { Chain } from '../types';
 import { ConfigService } from '../configService';
 import { CHAINS, getChainById as localGetChainById } from '../index';
 
-interface UseChainsOptions {
+export interface UseChainsOptions {
   configService?: ConfigService;
   enabled?: boolean;
 }
 
-interface UseChainsResult {
+export interface UseChainsResult {
   chains: Chain[];
   isLoading: boolean;
   error: Error | null;

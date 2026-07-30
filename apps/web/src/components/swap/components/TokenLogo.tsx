@@ -3,10 +3,16 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import { getChainById, getTokenLogo } from '../../../config';
-import type { Token } from '../../../types';
+
+type LogoToken = {
+  chainId: number | string;
+  address: string;
+  symbol: string;
+  logoURI?: string | null;
+};
 
 interface TokenLogoProps {
-  token: Token;
+  token: LogoToken;
   size?: number;
   className?: string;
 }

@@ -116,7 +116,9 @@ export const DEFAULT_CHAIN_ID = 1;
 export const DEFAULT_SLIPPAGE = 0.5;
 export const DEFAULT_DEADLINE = 20;
 export { useChains } from './hooks/useChains';
+export type { UseChainsOptions, UseChainsResult } from './hooks/useChains';
 export { useTokens } from './hooks/useTokens';
+export type { UseTokensOptions, UseTokensResult } from './hooks/useTokens';
 export { useConfig } from './hooks/useConfig';
 
 // ============ Config Service ============

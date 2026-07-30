@@ -82,14 +82,16 @@ export interface QuoteResponse {
   id: string;
   timestamp: number;
   expiresAt: number;
-  
+
   request: QuoteRequest;
   routes: Route[];
-  
+
   // Best route summary
   bestRoute: Route;
-  
+
   // Metadata
   processingTime: number;
   quotesReceived: number;
 }
+
+export type Quote = QuoteResponse;

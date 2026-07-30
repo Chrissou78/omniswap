@@ -41,6 +41,7 @@ export interface TokenAuditResult {
   creatorAddress: string;
   isTrusted: boolean;
   isVerified: boolean;
+  timestamp?: string | number | Date;
 }
 
 export interface AuditSummary {
@@ -48,6 +49,10 @@ export interface AuditSummary {
   riskScore: number;
   isHoneypot: boolean;
   hasHighTax: boolean;
+  isTrusted?: boolean;
+  criticalRisks?: number;
+  highRisks?: number;
+  mediumRisks?: number;
 }
 
 const GOPLUS_BASE_URL = 'https://api.gopluslabs.io/api/v1';

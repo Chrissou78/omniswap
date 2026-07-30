@@ -41,6 +41,8 @@ export interface Token {
   isCustom?: boolean;
   isVerified?: boolean;
   priceUsd?: number;
+  addedAt?: number;
+  addedBy?: string;
 }
 
 export interface ConfigVersion {

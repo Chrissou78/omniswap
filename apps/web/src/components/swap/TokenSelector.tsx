@@ -13,7 +13,7 @@ interface Token {
   decimals: number;
   logoURI?: string;
   logoUrl?: string;
-  chainId?: number | string;
+  chainId: number | string;
   price?: number;
   priceUsd?: number;
   verified?: boolean;
@@ -76,16 +76,16 @@ export function TokenSelector({
                     : "hover:bg-zinc-800")
                 }
               >
-                <TokenLogo src={token.logoURI} symbol={token.symbol} size={36} />
+                <TokenLogo token={token} size={36} />
                 <div className="flex flex-col items-start flex-1 min-w-0">
                   <span className="font-medium">{token.symbol}</span>
                   <span className="text-sm text-zinc-500 truncate w-full text-left">
                     {token.name}
                   </span>
                 </div>
-                {token.price && (
+                {token.priceUsd && (
                   <span className="text-sm text-zinc-400">
-                    \${token.price.toLocaleString(undefined, { maximumFractionDigits: 6 })}
+                    ${token.priceUsd.toLocaleString(undefined, { maximumFractionDigits: 6 })}
                   </span>
                 )}
               </button>

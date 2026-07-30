@@ -1,7 +1,10 @@
+const path = require('path');
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  
+  outputFileTracingRoot: path.join(__dirname, '../..'),
+
   // Make env vars available (only reference Vercel-injected vars)
   env: {
     NEXT_PUBLIC_PAYMENT_WALLET_EVM: process.env.NEXT_PUBLIC_PAYMENT_WALLET_EVM,

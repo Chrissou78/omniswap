@@ -45,8 +45,8 @@ export const TokenAuditView: React.FC<TokenAuditViewProps> = ({ chainId, address
     refetchOnMount: true,
   });
 
-  const { tokens } = useTokenStore();
-  const token = tokens.find(
+  const { getTokensByChain } = useTokenStore();
+  const token = getTokensByChain(chainId).find(
     (t) => t.address.toLowerCase() === address.toLowerCase() && String(t.chainId) === chainId
   );
 
@@ -152,9 +152,9 @@ export const TokenAuditView: React.FC<TokenAuditViewProps> = ({ chainId, address
           <div className="flex items-start gap-4">
             {/* Token Logo */}
             <div className="relative">
-              {token?.logoURI ? (
+              {token?.logoUrl ? (
                 <img 
-                  src={token.logoURI} 
+                  src={token.logoUrl}
                   alt={audit.symbol} 
                   className="w-16 h-16 rounded-full"
                 />
@@ -305,7 +305,8 @@ export const TokenAuditView: React.FC<TokenAuditViewProps> = ({ chainId, address
             <CardHeader>
               <CardTitle>Security Analysis</CardTitle>
               <CardDescription>
-                Powered by GoPlus Security • Last updated {formatDistanceToNow(audit.timestamp)} ago
+                Powered by GoPlus Security
+                {audit.timestamp && ` • Last updated ${formatDistanceToNow(new Date(audit.timestamp))} ago`}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -345,7 +346,7 @@ export const TokenAuditView: React.FC<TokenAuditViewProps> = ({ chainId, address
                               </div>
                             </div>
                             <Badge variant="outline" className={getRiskColor(risk.severity)}>
-                              {risk.category}
+                              {risk.severity}
                             </Badge>
                           </div>
                         ))}
@@ -538,9 +539,16 @@ export const TokenAuditView: React.FC<TokenAuditViewProps> = ({ chainId, address
                     <code className="text-sm">
                       {audit.creatorAddress.slice(0, 10)}...{audit.creatorAddress.slice(-8)}
                     </code>
-                    <span className="text-sm text-muted-foreground">
-                      ({audit.creatorPercent.toFixed(2)}% of supply)
-                    </span>
+                    {(() => {
+                      const creatorHolding = audit.topHolders.find(
+                        (h) => h.address.toLowerCase() === audit.creatorAddress.toLowerCase()
+                      );
+                      return creatorHolding ? (
+                        <span className="text-sm text-muted-foreground">
+                          ({creatorHolding.percent.toFixed(2)}% of supply)
+                        </span>
+                      ) : null;
+                    })()}
                   </div>
                 </div>
 

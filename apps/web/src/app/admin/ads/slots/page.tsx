@@ -10,7 +10,7 @@ interface AdSlot {
   position: string;
   width: number;
   height: number;
-  pricePerDayUsd: number;
+  basePrice: number;
   isActive: boolean;
   _count: { bookings: number };
 }
@@ -103,7 +103,7 @@ export default function AdSlotsPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500 dark:text-gray-400">Price/Day</span>
-                  <span className="text-gray-900 dark:text-white font-medium">${slot.pricePerDayUsd}</span>
+                  <span className="text-gray-900 dark:text-white font-medium">${slot.basePrice}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500 dark:text-gray-400">Bookings</span>
@@ -148,7 +148,7 @@ function AdSlotForm({
     position: slot?.position || '',
     width: slot?.width || 300,
     height: slot?.height || 250,
-    pricePerDayUsd: slot?.pricePerDayUsd || 10,
+    basePrice: slot?.basePrice || 10,
     description: '',
   });
   const [saving, setSaving] = useState(false);
@@ -240,8 +240,8 @@ function AdSlotForm({
             <input
               type="number"
               step="0.01"
-              value={form.pricePerDayUsd}
-              onChange={(e) => setForm({ ...form, pricePerDayUsd: parseFloat(e.target.value) || 0 })}
+              value={form.basePrice}
+              onChange={(e) => setForm({ ...form, basePrice: parseFloat(e.target.value) || 0 })}
               className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg"
               required
             />
