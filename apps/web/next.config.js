@@ -13,6 +13,13 @@ const nextConfig = {
   },
 
   webpack: (config, { isServer }) => {
+    // Optional feature of @coinbase/cdp-sdk (pulled in transitively via
+    // RainbowKit/wagmi's Coinbase connector) that isn't installed as a dependency.
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@x402/evm': false,
+    };
+
     if (isServer) {
       config.externals = [
         ...(config.externals || []),
