@@ -32,3 +32,5 @@ apps/mobile/ios/
 apps/mobile/.expo/
 *.apk
 *.ipa
+.vercel
+.env*

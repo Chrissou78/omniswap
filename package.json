@@ -37,8 +37,8 @@
       "bigint-buffer": "^1.1.5"
     },
     "neverBuiltDependencies": [
-      "tiny-secp256k1",
-      "bigint-buffer"
+      "bigint-buffer",
+      "tiny-secp256k1"
     ]
   }
 }

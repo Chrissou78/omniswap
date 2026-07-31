@@ -1,17 +1,7 @@
 {
   "version": 2,
-  "buildCommand": "pnpm --filter @omniswap/web build",
   "installCommand": "pnpm install --frozen-lockfile",
-  "builds": [
-    {
-      "src": "apps/web/package.json",
-      "use": "@vercel/next@latest"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "apps/web/$1"
-    }
-  ]
+  "buildCommand": "pnpm turbo run build --filter=@omniswap/web",
+  "outputDirectory": "apps/web/.next",
+  "framework": "nextjs"
 }
