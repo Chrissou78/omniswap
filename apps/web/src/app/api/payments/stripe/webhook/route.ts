@@ -2,20 +2,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2026-02-25.clover',
-});
-
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || '';
-
 export async function POST(request: NextRequest) {
   try {
     const body = await request.text();
     const signature = request.headers.get('stripe-signature');
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || '';
 
-    if (!signature || !webhookSecret) {
+    if (!signature || !webhookSecret || !process.env.STRIPE_SECRET_KEY) {
       return NextResponse.json({ error: 'Missing signature or webhook secret' }, { status: 400 });
     }
+
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+      apiVersion: '2026-02-25.clover',
+    });
 
     let event: Stripe.Event;
 
