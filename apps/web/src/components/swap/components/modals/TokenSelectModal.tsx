@@ -19,7 +19,6 @@ import {
 import { getTokenSecurity, type TokenAuditResult } from '@/services/goPlusService';
 import { getTokenPrice } from '@/services/priceService';
 import { useTokens } from '@/hooks/useTokens';
-import { useChains } from '@/hooks/useChains';
 import type { Chain, Token } from '@omniswap/shared';
 import type { TokenBalances } from '../../types';
 import { TokenLogo } from '../TokenLogo';
@@ -251,7 +250,6 @@ export function TokenSelectModal({
     isLoading: isLoadingTokens,
     refetch: refetchTokens,
   } = useTokens(chain.id);
-  const { getChainById } = useChains();
 
   // Local state
   const [search, setSearch] = useState('');
@@ -377,8 +375,11 @@ export function TokenSelectModal({
       searchAbortRef.current = abortController;
 
       try {
-        const currentChain = getChainById(chain.id);
-        if (!currentChain?.rpcDefault) {
+        // Use the chain already passed into this modal rather than re-looking it up
+        // via useChains()/@omniswap/shared's static+remote data, which lags behind
+        // apps/web/src/config/chains.json and doesn't know about newer chains
+        // (Monad, Plasma, Robinhood Chain) added there.
+        if (!chain?.rpcDefault) {
           throw new Error('RPC not available for this chain');
         }
 
@@ -386,7 +387,7 @@ export function TokenSelectModal({
         const tokenInfo = await fetchTokenFromContract(
           trimmedSearch,
           String(chain.id),
-          currentChain.rpcDefault
+          chain.rpcDefault
         );
 
         // Check if search was cancelled
@@ -469,7 +470,7 @@ export function TokenSelectModal({
         searchAbortRef.current.abort();
       }
     };
-  }, [search, chain.id, tokenExists, getChainById]);
+  }, [search, chain.id, tokenExists]);
 
   // Import custom token
   const handleImportToken = useCallback(() => {
