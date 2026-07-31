@@ -12,13 +12,13 @@ const nextConfig = {
     NEXT_PUBLIC_PAYMENT_WALLET_SUI: process.env.NEXT_PUBLIC_PAYMENT_WALLET_SUI,
   },
 
-  webpack: (config, { isServer }) => {
-    // Optional feature of @coinbase/cdp-sdk (pulled in transitively via
-    // RainbowKit/wagmi's Coinbase connector) that isn't installed as a dependency.
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      '@x402/evm': false,
-    };
+  webpack: (config, { isServer, webpack }) => {
+    // Optional x402 payment feature of @coinbase/cdp-sdk (pulled in transitively
+    // via RainbowKit/wagmi's Coinbase connector) whose @x402/* submodules aren't
+    // installed as dependencies and aren't used by this app.
+    config.plugins.push(
+      new webpack.IgnorePlugin({ resourceRegExp: /^@x402\// })
+    );
 
     if (isServer) {
       config.externals = [
