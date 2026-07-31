@@ -1,4 +1,5 @@
 // apps/web/src/app/api/admin/ads/slots/route.ts
+import { randomUUID } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getAdminSession } from '@/lib/admin-auth';
@@ -35,6 +36,7 @@ export async function POST(request: NextRequest) {
 
     const slot = await prisma.adSlot.create({
       data: {
+        id: randomUUID(),
         name: data.name,
         position: data.position,
         width: data.width,
