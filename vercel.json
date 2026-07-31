@@ -1,7 +1,4 @@
 {
   "version": 2,
-  "installCommand": "pnpm install --frozen-lockfile",
-  "buildCommand": "pnpm turbo run build --filter=@omniswap/web",
-  "outputDirectory": "apps/web/.next",
   "framework": "nextjs"
 }
