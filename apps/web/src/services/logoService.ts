@@ -9,7 +9,24 @@ import chainsData from '@/config/chains.json';
 // ============================================================================
 
 const TRUSTWALLET_CDN = 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains';
+// NOTE: coin-logos.simplr.sh only serves images at /images/<coingecko-id>/<size>.png —
+// it 302-redirects anything else (e.g. /<symbol>.png) to its GitHub repo page, which is
+// why symbol-based lookups against it always render as a broken image.
 const COIN_LOGOS_CDN = 'https://coin-logos.simplr.sh';
+// DefiLlama's chain-icon CDN, keyed by a chain's defillamaId. Covers brand-new chains
+// (Monad, Plasma, Robinhood Chain, ...) that TrustWallet's asset repo hasn't added yet.
+const DEFILLAMA_CHAIN_ICON_CDN = 'https://icons.llamao.fi/icons/chains/rsz_';
+// A handful of chains use a different slug for DefiLlama's icon CDN than for their
+// defillamaId (which is tuned for the price API and matches there under either form).
+const DEFILLAMA_ICON_SLUG_OVERRIDES: Record<string, string> = {
+  avax: 'avalanche',
+  era: 'zksync-era',
+  'metis-andromeda': 'metis',
+  worldchain: 'world-chain',
+};
+function defillamaIconSlug(defillamaId: string): string {
+  return DEFILLAMA_ICON_SLUG_OVERRIDES[defillamaId] || defillamaId;
+}
 const CUSTOM_LOGOS_KEY = 'omniswap_custom_logos';
 
 // ============================================================================
@@ -86,14 +103,14 @@ export function getChainLogo(chainId: string | number): string {
   if (chain?.trustwalletId) {
     return `${TRUSTWALLET_CDN}/${chain.trustwalletId}/info/logo.png`;
   }
-  
-  // 4. Try coin-logos CDN by chain symbol
-  if (chain?.symbol) {
-    return `${COIN_LOGOS_CDN}/${chain.symbol.toLowerCase()}.png`;
+
+  // 4. Try DefiLlama's chain-icon CDN (covers chains too new for TrustWallet's repo)
+  if (chain?.defillamaId) {
+    return `${DEFILLAMA_CHAIN_ICON_CDN}${defillamaIconSlug(chain.defillamaId)}.jpg`;
   }
-  
+
   // 5. Default fallback
-  return `${COIN_LOGOS_CDN}/eth.png`;
+  return `${TRUSTWALLET_CDN}/ethereum/info/logo.png`;
 }
 
 export function setChainLogo(chainId: string | number, url: string): void {
@@ -239,9 +256,9 @@ export async function autoDetectChainLogo(chainId: string | number): Promise<str
     }
   }
   
-  // Try coin-logos by symbol
-  if (chain?.symbol) {
-    const url = `${COIN_LOGOS_CDN}/${chain.symbol.toLowerCase()}.png`;
+  // Try DefiLlama's chain-icon CDN (covers chains too new for TrustWallet's repo)
+  if (chain?.defillamaId) {
+    const url = `${DEFILLAMA_CHAIN_ICON_CDN}${defillamaIconSlug(chain.defillamaId)}.jpg`;
     try {
       const response = await fetch(url, { method: 'HEAD' });
       if (response.ok) {

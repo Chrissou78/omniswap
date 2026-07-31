@@ -173,27 +173,40 @@ export function getStablecoins(chainId: string | number): Token[] {
 // ============================================================================
 
 const TRUSTWALLET_BASE = 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains';
+// DefiLlama's chain-icon CDN, keyed by a chain slug. Covers brand-new chains
+// (Monad, Plasma, Robinhood Chain, ...) that TrustWallet's asset repo hasn't added yet.
+const DEFILLAMA_ICON_BASE = 'https://icons.llamao.fi/icons/chains/rsz_';
+// A handful of chains use a different slug for DefiLlama's icon CDN than for their
+// defillamaId (which is tuned for the price API and matches there under either form).
+const DEFILLAMA_ICON_SLUG_OVERRIDES: Record<string, string> = {
+  avax: 'avalanche',
+  era: 'zksync-era',
+  'metis-andromeda': 'metis',
+  worldchain: 'world-chain',
+};
 
 export function getChainLogo(chainId: string | number): string {
   const chainKey = chainId.toString();
-  
+
   // Priority 1: Explicit logo in logos.json
   if (LOGOS.chains[chainKey]) {
     return LOGOS.chains[chainKey];
   }
-  
+
   const chain = getChainById(chainId);
-  
+
   // Priority 2: TrustWallet ID from chain config (chains.json)
   if (chain?.trustwalletId) {
     return `${TRUSTWALLET_BASE}/${chain.trustwalletId}/info/logo.png`;
   }
-  
-  // Priority 3: Fallback to coin-logos CDN by symbol
-  if (chain?.symbol) {
-    return `https://cdn.jsdelivr.net/gh/AugurWorks/coin-logos@master/coins/${chain.symbol.toLowerCase()}.png`;
+
+  // Priority 3: DefiLlama's chain-icon CDN
+  const defillamaId = (chain as any)?.defillamaId;
+  if (defillamaId) {
+    const slug = DEFILLAMA_ICON_SLUG_OVERRIDES[defillamaId] || defillamaId;
+    return `${DEFILLAMA_ICON_BASE}${slug}.jpg`;
   }
-  
+
   return '/images/chains/unknown.png';
 }
 

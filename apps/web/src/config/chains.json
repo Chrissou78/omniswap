@@ -263,7 +263,7 @@
       "type": "evm",
       "trustwalletId": null,
       "dexscreenerId": null,
-      "defillamaId": null,
+      "defillamaId": "robinhood",
       "coingeckoAssetPlatform": null,
       "wrappedNativeAddress": "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
       "rpcEnvKey": "NEXT_PUBLIC_ROBINHOOD_CHAIN_RPC",
@@ -548,18 +548,18 @@
     {
       "id": 9745,
       "name": "Plasma",
-      "symbol": "ETH",
+      "symbol": "XPL",
       "color": "#7B3FE4",
       "type": "evm",
       "trustwalletId": null,
       "dexscreenerId": null,
-      "defillamaId": null,
-      "coingeckoAssetPlatform": null,
+      "defillamaId": "plasma",
+      "coingeckoAssetPlatform": "plasma",
       "wrappedNativeAddress": null,
       "rpcEnvKey": "NEXT_PUBLIC_PLASMA_RPC",
-      "rpcDefault": "https://rpc.plasma.io",
-      "explorerUrl": "https://explorer.plasma.io",
-      "explorerName": "Plasma Explorer",
+      "rpcDefault": "https://rpc.plasma.to",
+      "explorerUrl": "https://plasmascan.to",
+      "explorerName": "PlasmaScan",
       "popularity": 15
     }
   ]

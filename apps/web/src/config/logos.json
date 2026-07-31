@@ -19,10 +19,6 @@
     "534352": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/scroll/info/logo.png",
     "1284": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/moonbeam/info/logo.png",
     "1285": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/moonriver/info/logo.png",
-    "146": "https://coin-logos.simplr.sh/sonic.png",
-    "80094": "https://coin-logos.simplr.sh/bera.png",
-    "999": "https://coin-logos.simplr.sh/hype.png",
-    "480": "https://coin-logos.simplr.sh/wld.png",
     "solana-mainnet": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/solana/info/logo.png",
     "sui-mainnet": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/sui/info/logo.png"
   },
