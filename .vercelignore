@@ -10,7 +10,6 @@ eas.json
 README.md
 CHANGELOG.md
 apps/mobile
-apps/api
 apps/admin
 packages/contracts
 packages/database
