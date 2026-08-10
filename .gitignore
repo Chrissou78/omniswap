@@ -34,3 +34,4 @@ apps/mobile/.expo/
 *.ipa
 .vercel
 .env*
+!.env.example

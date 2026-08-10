@@ -1,11 +1,7 @@
 // apps/web/src/app/api/admin/auth/login/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-
-// Dev mode credentials - replace with DB lookup in production
-const DEV_ADMINS = [
-  { id: '1', email: 'admin@omniswap.io', password: 'admin123', role: 'SUPER_ADMIN', name: 'Admin' },
-];
+import { setAdminSession } from '@/lib/admin-auth';
+import { verifyPassword } from '@/lib/password';
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,31 +11,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Email and password required' }, { status: 400 });
     }
 
-    // Dev mode: simple credential check
-    const admin = DEV_ADMINS.find(
-      (a) => a.email.toLowerCase() === email.toLowerCase() && a.password === password
-    );
+    const adminEmail = process.env.ADMIN_EMAIL;
+    const adminPasswordHash = process.env.ADMIN_PASSWORD_HASH;
 
-    if (!admin) {
+    if (!adminEmail || !adminPasswordHash) {
+      console.error('Admin login misconfigured: ADMIN_EMAIL / ADMIN_PASSWORD_HASH not set');
+      return NextResponse.json({ error: 'Admin login is not configured' }, { status: 503 });
+    }
+
+    const emailMatches = email.toLowerCase() === adminEmail.toLowerCase();
+    // Always run verifyPassword, even on email mismatch, so response timing doesn't
+    // reveal whether the email was valid.
+    const passwordMatches = verifyPassword(password, adminPasswordHash);
+
+    if (!emailMatches || !passwordMatches) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
 
     const session = {
-      id: admin.id,
-      email: admin.email,
-      role: admin.role,
-      name: admin.name,
+      id: '1',
+      email: adminEmail,
+      role: 'SUPER_ADMIN' as const,
+      name: 'Admin',
     };
 
-    // Set session cookie
-    const cookieStore = await cookies();
-    cookieStore.set('admin_session', JSON.stringify(session), {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7, // 7 days
-      path: '/',
-    });
+    await setAdminSession(session);
 
     return NextResponse.json(session);
   } catch (error) {
