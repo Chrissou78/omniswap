@@ -164,6 +164,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@7kprotocol/sdk-ts':
+        specifier: 2.3.5
+        version: 2.3.5(@mysten/sui@1.45.2)(bignumber.js@9.3.1)(bn.js@5.2.5)
       '@mysten/dapp-kit':
         specifier: ^0.19.0
         version: 0.19.11(@tanstack/react-query@5.101.4)(@types/react-dom@18.3.7)(@types/react@18.3.31)(react-dom@18.3.1)(react@18.3.1)(typescript@5.9.3)
@@ -441,6 +444,18 @@ packages:
       '@gql.tada/internal': 1.2.2(graphql@16.14.2)(typescript@5.9.3)
       graphql: 16.14.2
       typescript: 5.9.3
+    dev: false
+
+  /@7kprotocol/sdk-ts@2.3.5(@mysten/sui@1.45.2)(bignumber.js@9.3.1)(bn.js@5.2.5):
+    resolution: {integrity: sha512-MEUnlu/7GHs7R2QF7wG7Fwl2TpjErQmPdnslesRxMzN9DUbMhnrGEylilhFYKoSlsZIDlvG8k5IGanrQdyK2Ow==}
+    peerDependencies:
+      '@mysten/sui': ^1.17.0
+      bignumber.js: ^9.1.2
+      bn.js: ^5.2.1
+    dependencies:
+      '@mysten/sui': 1.45.2(typescript@5.9.3)
+      bignumber.js: 9.3.1
+      bn.js: 5.2.5
     dev: false
 
   /@adraffy/ens-normalize@1.11.1:
@@ -3422,7 +3437,7 @@ packages:
       '@noble/hashes': 1.8.0
       '@scure/base': 1.2.6
       '@types/debug': 4.1.13
-      debug: 4.3.4
+      debug: 4.4.3
       pony-cause: 2.1.11
       semver: 7.8.5
       uuid: 9.0.1
@@ -3439,7 +3454,7 @@ packages:
       '@noble/hashes': 1.8.0
       '@scure/base': 1.2.6
       '@types/debug': 4.1.13
-      debug: 4.3.4
+      debug: 4.4.3
       pony-cause: 2.1.11
       semver: 7.8.5
       uuid: 9.0.1
@@ -14351,7 +14366,7 @@ packages:
     resolution: {integrity: sha512-an2S5quJMiy5bnZKEf6AkfH/7r8CzHvhchU40gxN+OM6HPhe7Z9T1FUychcf2M9PpPOO0Hf7BAEfJkw2TDIBDw==}
     engines: {node: '>=12.0.0'}
     dependencies:
-      readable-stream: 3.6.2
+      readable-stream: 4.7.0
       webextension-polyfill: 0.10.0
     dev: false
 
@@ -17313,10 +17328,10 @@ packages:
         optional: true
     dependencies:
       '@adraffy/ens-normalize': 1.11.1
-      '@noble/curves': 1.8.1
-      '@noble/hashes': 1.7.1
-      '@scure/bip32': 1.6.2
-      '@scure/bip39': 1.5.4
+      '@noble/curves': 1.9.7
+      '@noble/hashes': 1.8.0
+      '@scure/bip32': 1.7.0
+      '@scure/bip39': 1.6.0
       abitype: 1.0.8(typescript@5.9.3)
       eventemitter3: 5.0.1
       typescript: 5.9.3

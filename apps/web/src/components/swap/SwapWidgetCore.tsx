@@ -3,9 +3,11 @@ import { useAccount, useSignTypedData, useSendTransaction } from 'wagmi';
 import { useWallet as useSolanaWallet } from '@solana/wallet-adapter-react';
 import { Connection, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { SuiClient } from '@mysten/sui/client';
+import { useSignAndExecuteTransaction } from '@mysten/dapp-kit';
 import { compareMexcRoute } from '@/services/mexcService';
 import { buildRealSwapPlan, waitForRealReceipt } from './services/realSwapExecutor';
 import { buildRealSolanaSwapPlan, confirmRealSolanaTransaction } from './services/realSolanaSwapExecutor';
+import { buildRealSuiSwapPlan } from './services/realSuiSwapExecutor';
 import { PLATFORM_FEES } from '@/config/fees';
 import { getChainRpc } from '@/lib/chain-config';
 
@@ -612,6 +614,7 @@ export function SwapWidgetCore() {
   const { suiAddress, suiConnected } = useSuiWallet();
   const { signTypedDataAsync } = useSignTypedData();
   const { sendTransactionAsync } = useSendTransaction();
+  const { mutateAsync: signAndExecuteSuiTransaction } = useSignAndExecuteTransaction();
 
   // Non-EVM Balances
   const [solanaBalances, setSolanaBalances] = useState<TokenBalances>({});
@@ -1281,17 +1284,20 @@ export function SwapWidgetCore() {
     setSelectedRoute(route);
   };
 
-  // Real swap execution is currently wired up for same-chain EVM-to-EVM swaps
-  // (via 1inch/0x) and same-chain Solana-to-Solana swaps (via Jupiter).
-  // Cross-chain routing, Sui, the gasless "delegated" relay, and the CEX
-  // "alternate" route are not yet implemented for real execution — the button
-  // is disabled with a "Coming soon" state for those cases (see
-  // getButtonText/disabled below) rather than faking success.
+  // Real swap execution is wired up for same-chain swaps on all three chain
+  // families: EVM (1inch/0x), Solana (Jupiter), and Sui (7K Protocol).
+  // Cross-chain routing, the gasless "delegated" relay, and the CEX "alternate"
+  // route are not yet implemented for real execution — the button is disabled
+  // with a "Coming soon" state for those cases (see getButtonText/disabled
+  // below) rather than faking success.
   const canExecuteRealSwap = useMemo(() => {
     if (selectedRoute !== 'direct' || inputChain.id !== outputChain.id) return false;
     if (inputChain.type === 'evm' && outputChain.type === 'evm') return !!evmAddress;
     if (inputChain.type === 'solana' && outputChain.type === 'solana') {
       return !!solanaPublicKey && !!sendSolanaTransaction;
+    }
+    if (inputChain.type === 'sui' && outputChain.type === 'sui') {
+      return !!suiAddress;
     }
     return false;
   }, [
@@ -1303,6 +1309,7 @@ export function SwapWidgetCore() {
     evmAddress,
     solanaPublicKey,
     sendSolanaTransaction,
+    suiAddress,
   ]);
 
   const executeEvmSwap = async () => {
@@ -1372,6 +1379,29 @@ export function SwapWidgetCore() {
     return { txHash: signature, userAddress: solanaPublicKey.toString() };
   };
 
+  const executeSuiSwap = async () => {
+    if (!inputToken || !outputToken || !suiAddress) {
+      throw new Error('Wallet not connected');
+    }
+
+    const plan = await buildRealSuiSwapPlan({
+      inputCoinType: inputToken.address,
+      outputCoinType: outputToken.address,
+      amount: inputAmount,
+      inputDecimals: inputToken.decimals,
+      slippagePercent: parseFloat(slippage) || 0.5,
+      senderAddress: suiAddress,
+    });
+
+    const result = await signAndExecuteSuiTransaction({ transaction: plan.transaction });
+
+    if (!result?.digest) {
+      throw new Error('Sui transaction did not return a digest');
+    }
+
+    return { txHash: result.digest, userAddress: suiAddress };
+  };
+
   const handleSwap = async () => {
     if (!inputToken || !outputToken || !inputAmount || !outputAmount) return;
     if (!canExecuteRealSwap) return; // button should already be disabled in this case
@@ -1381,7 +1411,11 @@ export function SwapWidgetCore() {
 
     try {
       const { txHash, userAddress } =
-        inputChain.type === 'solana' ? await executeSolanaSwap() : await executeEvmSwap();
+        inputChain.type === 'solana'
+          ? await executeSolanaSwap()
+          : inputChain.type === 'sui'
+          ? await executeSuiSwap()
+          : await executeEvmSwap();
 
       const fromAmountUsd = parseFloat(inputAmount) * (inputPrice?.priceUsd || 1);
       const toAmountUsd = parseFloat(outputAmount.replace('~', '')) * (outputPrice?.priceUsd || 1);
@@ -1976,14 +2010,11 @@ export function SwapWidgetCore() {
 
         {!canExecuteRealSwap && isConnected && inputAmount && outputAmount && outputAmount !== '...' && (
           <p className="mt-2 text-xs text-center text-amber-600 dark:text-amber-400">
-            {inputChain.type === 'sui' || outputChain.type === 'sui'
-              ? 'Live swaps on Sui are coming soon.'
-              : (inputChain.type !== 'evm' && inputChain.type !== 'solana') ||
-                (outputChain.type !== 'evm' && outputChain.type !== 'solana')
-              ? 'Live swaps aren\'t available on this network yet.'
-              : inputChain.id !== outputChain.id
+            {inputChain.id !== outputChain.id
               ? 'Cross-chain swaps are coming soon — live trading currently supports same-chain swaps only.'
-              : 'This route is coming soon — select "Direct (DEX)" above for live trading.'}
+              : selectedRoute !== 'direct'
+              ? 'This route is coming soon — select "Direct (DEX)" above for live trading.'
+              : "Live swaps aren't available on this network yet."}
           </p>
         )}
 
