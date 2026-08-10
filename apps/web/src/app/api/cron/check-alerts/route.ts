@@ -10,7 +10,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getTokenPrice } from '@/services/priceService';
+import { getServerTokenPrice } from '@/lib/serverPrice';
 import { shouldTrigger, isCooledDown } from '@/lib/alerts';
 
 export const maxDuration = 60;
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
   for (const alert of alerts) {
     checked++;
     try {
-      const price = await getTokenPrice(alert.chainId, alert.tokenAddress, alert.tokenSymbol);
+      const price = await getServerTokenPrice(alert.chainId, alert.tokenAddress);
       const currentPrice = price?.priceUsd;
       if (currentPrice == null) continue;
 

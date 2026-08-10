@@ -4,7 +4,7 @@
 // distance-to-target. Public (prices aren't user data) but read-only.
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getTokenPrice } from '@/services/priceService';
+import { getServerTokenPrice } from '@/lib/serverPrice';
 
 export async function GET(
   request: NextRequest,
@@ -13,7 +13,7 @@ export async function GET(
   const { chainId, address } = await params;
 
   try {
-    const price = await getTokenPrice(chainId, address);
+    const price = await getServerTokenPrice(chainId, address);
 
     if (!price || price.priceUsd == null) {
       return NextResponse.json({ error: 'Price unavailable for this token' }, { status: 404 });

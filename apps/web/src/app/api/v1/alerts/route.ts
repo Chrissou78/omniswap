@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getUserSession } from '@/lib/user-auth';
-import { getTokenPrice } from '@/services/priceService';
+import { getServerTokenPrice } from '@/lib/serverPrice';
 import { UI_TO_DB_ALERT_TYPE, toUiAlert } from '@/lib/alerts';
 
 export async function GET() {
@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
     // baseline (and the UI can show drift since creation).
     let priceAtCreation: number | null = null;
     try {
-      const price = await getTokenPrice(chainId, tokenAddress, tokenSymbol);
+      const price = await getServerTokenPrice(chainId, tokenAddress);
       priceAtCreation = price?.priceUsd ?? null;
     } catch {
       // Non-fatal: an above/below alert still works without a baseline.
