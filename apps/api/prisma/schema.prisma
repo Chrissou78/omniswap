@@ -404,11 +404,16 @@ model PriceAlert {
   chainId         String
   tokenAddress    String
   tokenSymbol     String
+  tokenName       String?
+  tokenLogoURI    String?
   type            AlertType
   targetPrice     Float
+  targetPercentChange Float?
+  priceAtCreation Float?
   currentPrice    Float?
   status          AlertStatus @default(ACTIVE)
   triggeredAt     DateTime?
+  triggerCount    Int         @default(0)
   notifyEmail     Boolean     @default(true)
   notifyPush      Boolean     @default(true)
   notifyTelegram  Boolean     @default(false)
@@ -420,10 +425,34 @@ model PriceAlert {
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
   user            User        @relation(fields: [userId], references: [id])
+  history         AlertHistory[]
 
   @@index([userId, status])
   @@index([status, tokenAddress])
 }
+
+model AlertHistory {
+  id                String     @id @default(cuid())
+  alertId           String
+  userId            String
+  tokenSymbol       String
+  tokenLogoURI      String?
+  chainId           String
+  type              AlertType
+  targetPrice       Float?
+  targetPercentChange Float?
+  triggeredPrice    Float
+  notificationsSent String[]
+  triggeredAt       DateTime   @default(now())
+  alert             PriceAlert @relation(fields: [alertId], references: [id], onDelete: Cascade)
+
+  @@index([userId, triggeredAt])
+  @@index([alertId])
+}
+
+// NOTE: swap history reuses the existing `Swap` model above, and portfolio
+// value history reuses the existing `Portfolio`/`PortfolioSnapshot` models -
+// deliberately not duplicating them here.
 
 model AdSlot {
   id          String   @id

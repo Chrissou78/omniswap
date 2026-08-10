@@ -67,6 +67,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { useWallet } from '@/hooks/useWallet';
+import { useWalletAuth } from '@/hooks/useWalletAuth';
 import { TokenSelector } from '@/components/swap/TokenSelector';
 import { cn, formatCurrency, formatNumber, formatPercent, truncateAddress } from '@/lib/utils';
 
@@ -640,6 +641,16 @@ function ConnectWalletPrompt() {
 export default function PriceAlertsPage() {
   const queryClient = useQueryClient();
   const { isConnected, address } = useWallet();
+  // Alerts are per-user data, so the wallet must be signed in (a signature
+  // proving address ownership), not merely connected.
+  const {
+    user: authUser,
+    isLoading: authLoading,
+    isSigningIn,
+    error: authError,
+    signIn,
+  } = useWalletAuth();
+  const isSignedIn = !!authUser;
 
   // State
   const [activeTab, setActiveTab] = useState('create');
@@ -665,21 +676,21 @@ export default function PriceAlertsPage() {
   const { data: alerts, isLoading: alertsLoading } = useQuery({
     queryKey: ['alerts'],
     queryFn: fetchAlerts,
-    enabled: isConnected,
+    enabled: isSignedIn,
     refetchInterval: 30000, // Refresh every 30s
   });
 
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ['alertStats'],
     queryFn: fetchAlertStats,
-    enabled: isConnected,
+    enabled: isSignedIn,
     refetchInterval: 30000,
   });
 
   const { data: history, isLoading: historyLoading } = useQuery({
     queryKey: ['alertHistory'],
     queryFn: fetchAlertHistory,
-    enabled: isConnected,
+    enabled: isSignedIn,
   });
 
   const { data: tokenPrice, isLoading: priceLoading } = useQuery({
@@ -872,6 +883,37 @@ export default function PriceAlertsPage() {
     return (
       <div className="container mx-auto px-4 py-8">
         <ConnectWalletPrompt />
+      </div>
+    );
+  }
+
+  // Wallet connected but not signed in: alerts are private per-user data, so we
+  // need a signature proving this wallet's owner is the one asking.
+  if (!authLoading && !isSignedIn) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <Card className="max-w-md mx-auto">
+          <CardHeader>
+            <CardTitle>Sign in to use price alerts</CardTitle>
+            <CardDescription>
+              Sign a message to prove you own this wallet. This is free, costs no gas, and
+              never authorizes a transaction.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Button onClick={signIn} disabled={isSigningIn} className="w-full">
+              {isSigningIn ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Waiting for signature...
+                </>
+              ) : (
+                'Sign in with wallet'
+              )}
+            </Button>
+            {authError && <p className="text-sm text-red-500">{authError}</p>}
+          </CardContent>
+        </Card>
       </div>
     );
   }
