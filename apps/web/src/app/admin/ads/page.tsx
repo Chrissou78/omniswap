@@ -22,19 +22,9 @@ export default function AdsPage() {
   useEffect(() => {
     const loadStats = async () => {
       try {
-        // In production, fetch from API
-        await new Promise((r) => setTimeout(r, 500));
-        setStats({
-          totalSlots: 5,
-          activeSlots: 4,
-          pendingRequests: 3,
-          activeBookings: 8,
-          completedBookings: 45,
-          totalRevenue: 125000,
-          monthlyRevenue: 12500,
-          totalImpressions: 2500000,
-          totalClicks: 62500,
-        });
+        const res = await fetch('/api/admin/ads/stats');
+        if (!res.ok) throw new Error('Failed to fetch ad stats');
+        setStats(await res.json());
       } catch (error) {
         console.error('Failed to load stats:', error);
       } finally {

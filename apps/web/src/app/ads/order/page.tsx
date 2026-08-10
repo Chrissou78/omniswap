@@ -229,7 +229,17 @@ export default function AdOrderPage() {
       );
 
       const results = await Promise.all(bookingPromises);
-      const ids = results.map(r => r.booking?.id).filter(Boolean);
+
+      // Surface server-side rejections (e.g. payment verification failure)
+      // instead of silently showing a success screen.
+      const failed = results.filter((r) => r?.error);
+      if (failed.length > 0) {
+        setError(failed[0].error);
+        return;
+      }
+
+      // /api/ads/book returns the booking object directly, not { booking }
+      const ids = results.map((r) => r?.id).filter(Boolean);
       setBookingIds(ids);
       setPaymentComplete(true);
     } catch (err) {

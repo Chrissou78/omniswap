@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { href: '/admin/ads', label: 'Advertising', icon: 'megaphone' },
   { href: '/admin/ads/bookings', label: 'Ad Bookings', icon: 'calendar' },
   { href: '/admin/ads/slots', label: 'Ad Slots', icon: 'layout' },
+  { href: '/admin/listings', label: 'Token Listings', icon: 'coins' },
   { href: '/admin/settings', label: 'Settings', icon: 'settings' },
 ];
 

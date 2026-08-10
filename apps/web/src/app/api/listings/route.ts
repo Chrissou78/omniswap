@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { verifyPayment } from '@/lib/paymentVerification';
 
 export async function POST(request: NextRequest) {
   try {
@@ -70,7 +71,31 @@ export async function POST(request: NextRequest) {
       where: { id: 'default' },
     });
 
-    // Create listing request with payment already recorded
+    // Fee comes from server-side settings, never from the client's `listingFee`.
+    const expectedFee = settings?.tokenListingFee || 300;
+
+    // Guard against one payment being reused for multiple listings.
+    const priorClaims = await prisma.tokenListingRequest.aggregate({
+      where: { paymentTxHash: payment.txHash, paymentStatus: 'PAID' },
+      _sum: { listingFee: true },
+    });
+    const cumulativeExpectedUsd = (priorClaims._sum.listingFee ?? 0) + expectedFee;
+
+    const verification = await verifyPayment({
+      txHash: payment.txHash,
+      chainId: String(payment.chainId),
+      token: String(payment.token || ''),
+      expectedAmountUsd: cumulativeExpectedUsd,
+    });
+
+    if (!verification.verified) {
+      return NextResponse.json(
+        { error: `Payment could not be verified: ${verification.reason}` },
+        { status: 402 }
+      );
+    }
+
+    // Create listing request - payment is now verified against the chain / Stripe
     const listing = await prisma.tokenListingRequest.create({
       data: {
         chainId: parseInt(chainId),
@@ -96,8 +121,7 @@ export async function POST(request: NextRequest) {
         email,
         telegramHandle,
         projectRole,
-        listingFee: settings?.tokenListingFee || 300,
-        // Payment info - already paid!
+        listingFee: expectedFee,
         paymentStatus: 'PAID',
         paymentChainId: payment.chainId,
         paymentMethod: payment.token,

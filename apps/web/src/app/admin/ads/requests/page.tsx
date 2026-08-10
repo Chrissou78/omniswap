@@ -8,8 +8,8 @@ import Image from 'next/image';
 interface AdRequest {
   id: string;
   advertiser: {
-    walletAddress: string;
     companyName?: string;
+    contactName?: string;
     email?: string;
   };
   slot: {
@@ -24,10 +24,38 @@ interface AdRequest {
   endDate: string;
   totalDays: number;
   totalPriceUsd: number;
-  platformFeeUsd: number;
-  paymentStatus: 'PENDING' | 'CONFIRMED';
+  paymentStatus: string;
   paymentTxHash?: string;
+  paymentChainId?: string;
   createdAt: string;
+}
+
+/** Map the real AdBooking API row onto this review page's view model. */
+function toAdRequest(row: any): AdRequest {
+  return {
+    id: row.id,
+    advertiser: {
+      companyName: row.companyName ?? undefined,
+      contactName: row.contactName ?? undefined,
+      email: row.email ?? undefined,
+    },
+    slot: {
+      name: row.slot?.name ?? 'Unknown slot',
+      width: row.slot?.width ?? 0,
+      height: row.slot?.height ?? 0,
+    },
+    imageUrl: row.imageUrl ?? '',
+    targetUrl: row.targetUrl ?? '',
+    altText: row.altText ?? '',
+    startDate: row.startDate,
+    endDate: row.endDate,
+    totalDays: row.days ?? 0,
+    totalPriceUsd: row.finalPrice ?? 0,
+    paymentStatus: row.paymentStatus ?? 'UNPAID',
+    paymentTxHash: row.paymentTxHash ?? undefined,
+    paymentChainId: row.paymentChainId ?? undefined,
+    createdAt: row.createdAt,
+  };
 }
 
 export default function AdRequestsPage() {
@@ -37,6 +65,7 @@ export default function AdRequestsPage() {
   const [rejectionReason, setRejectionReason] = useState('');
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     loadRequests();
@@ -44,43 +73,14 @@ export default function AdRequestsPage() {
 
   const loadRequests = async () => {
     try {
-      // In production, fetch from API: GET /api/admin/ads/requests
-      await new Promise((r) => setTimeout(r, 500));
-      setRequests([
-        {
-          id: '1',
-          advertiser: { walletAddress: '0x1234...5678', companyName: 'DeFi Protocol', email: 'ads@defi.com' },
-          slot: { name: 'Header Banner', width: 728, height: 90 },
-          imageUrl: 'https://placehold.co/728x90/1a1a2e/ffffff?text=DeFi+Protocol',
-          targetUrl: 'https://defiprotocol.com',
-          altText: 'DeFi Protocol - Earn 10% APY',
-          startDate: '2026-01-25',
-          endDate: '2026-02-01',
-          totalDays: 7,
-          totalPriceUsd: 350,
-          platformFeeUsd: 175,
-          paymentStatus: 'CONFIRMED',
-          paymentTxHash: '0xabc123def456...',
-          createdAt: '2026-01-22T10:30:00Z',
-        },
-        {
-          id: '2',
-          advertiser: { walletAddress: '0x9876...4321', companyName: 'NFT Market' },
-          slot: { name: 'Sidebar', width: 300, height: 250 },
-          imageUrl: 'https://placehold.co/300x250/2d1b69/ffffff?text=NFT+Market',
-          targetUrl: 'https://nftmarket.io',
-          altText: 'Trade NFTs',
-          startDate: '2026-01-26',
-          endDate: '2026-02-02',
-          totalDays: 7,
-          totalPriceUsd: 210,
-          platformFeeUsd: 105,
-          paymentStatus: 'PENDING',
-          createdAt: '2026-01-22T14:15:00Z',
-        },
-      ]);
+      // Bookings awaiting admin approval are AdBooking rows in PENDING_APPROVAL.
+      const res = await fetch('/api/admin/ads/bookings?status=PENDING_APPROVAL');
+      if (!res.ok) throw new Error('Failed to fetch pending requests');
+      const rows = await res.json();
+      setRequests(Array.isArray(rows) ? rows.map(toAdRequest) : []);
     } catch (error) {
       console.error('Failed to load requests:', error);
+      setLoadError('Could not load pending requests.');
     } finally {
       setIsLoading(false);
     }
@@ -88,12 +88,18 @@ export default function AdRequestsPage() {
 
   const handleApprove = async (requestId: string) => {
     setProcessingId(requestId);
+    setLoadError('');
     try {
-      // In production: POST /api/admin/ads/requests/{id}/approve
-      await new Promise((r) => setTimeout(r, 1000));
-      setRequests(requests.filter((r) => r.id !== requestId));
+      const res = await fetch(`/api/admin/ads/bookings/${requestId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'APPROVED' }),
+      });
+      if (!res.ok) throw new Error('Approve failed');
+      setRequests((prev) => prev.filter((r) => r.id !== requestId));
     } catch (error) {
       console.error('Failed to approve:', error);
+      setLoadError('Failed to approve this request. Please try again.');
     } finally {
       setProcessingId(null);
     }
@@ -101,16 +107,23 @@ export default function AdRequestsPage() {
 
   const handleReject = async () => {
     if (!selectedRequest || !rejectionReason.trim()) return;
-    setProcessingId(selectedRequest.id);
+    const requestId = selectedRequest.id;
+    setProcessingId(requestId);
+    setLoadError('');
     try {
-      // In production: POST /api/admin/ads/requests/{id}/reject
-      await new Promise((r) => setTimeout(r, 1000));
-      setRequests(requests.filter((r) => r.id !== selectedRequest.id));
+      const res = await fetch(`/api/admin/ads/bookings/${requestId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'REJECTED', rejectionReason }),
+      });
+      if (!res.ok) throw new Error('Reject failed');
+      setRequests((prev) => prev.filter((r) => r.id !== requestId));
       setShowRejectModal(false);
       setSelectedRequest(null);
       setRejectionReason('');
     } catch (error) {
       console.error('Failed to reject:', error);
+      setLoadError('Failed to reject this request. Please try again.');
     } finally {
       setProcessingId(null);
     }
@@ -153,6 +166,12 @@ export default function AdRequestsPage() {
           )}
         </div>
       </div>
+
+      {loadError && (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 text-sm text-red-700 dark:text-red-400">
+          {loadError}
+        </div>
+      )}
 
       {requests.length === 0 ? (
         <div className="bg-white dark:bg-gray-800 rounded-xl p-12 text-center border border-gray-200 dark:border-gray-700">
@@ -201,14 +220,16 @@ export default function AdRequestsPage() {
                         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                           {request.advertiser.companyName || 'Unknown Advertiser'}
                         </h3>
-                        <p className="text-sm text-gray-500 font-mono">{request.advertiser.walletAddress}</p>
+                        {request.advertiser.contactName && (
+                          <p className="text-sm text-gray-500">{request.advertiser.contactName}</p>
+                        )}
                         {request.advertiser.email && (
                           <p className="text-sm text-gray-500">{request.advertiser.email}</p>
                         )}
                       </div>
                       <span
                         className={`px-3 py-1 text-xs font-medium rounded-full ${
-                          request.paymentStatus === 'CONFIRMED'
+                          request.paymentStatus === 'PAID'
                             ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
                             : 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400'
                         }`}
@@ -226,15 +247,24 @@ export default function AdRequestsPage() {
                       <div>
                         <p className="text-xs text-gray-500">Duration</p>
                         <p className="text-sm font-medium text-gray-900 dark:text-white">{request.totalDays} days</p>
-                        <p className="text-xs text-gray-400">{request.startDate}</p>
+                        <p className="text-xs text-gray-400">
+                          {new Date(request.startDate).toLocaleDateString()}
+                        </p>
                       </div>
                       <div>
                         <p className="text-xs text-gray-500">Total</p>
                         <p className="text-sm font-medium text-gray-900 dark:text-white">${request.totalPriceUsd}</p>
                       </div>
                       <div>
-                        <p className="text-xs text-gray-500">Platform Fee</p>
-                        <p className="text-sm font-medium text-green-600">${request.platformFeeUsd}</p>
+                        <p className="text-xs text-gray-500">Payment</p>
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">
+                          {request.paymentChainId === 'stripe' ? 'Card (Stripe)' : 'Crypto'}
+                        </p>
+                        {request.paymentTxHash && (
+                          <p className="text-xs text-gray-400 font-mono truncate max-w-[140px]">
+                            {request.paymentTxHash}
+                          </p>
+                        )}
                       </div>
                     </div>
 
@@ -247,7 +277,7 @@ export default function AdRequestsPage() {
                     <div className="flex items-center gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
                       <button
                         onClick={() => handleApprove(request.id)}
-                        disabled={request.paymentStatus !== 'CONFIRMED' || processingId === request.id}
+                        disabled={request.paymentStatus !== 'PAID' || processingId === request.id}
                         className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center gap-2"
                       >
                         {processingId === request.id ? (

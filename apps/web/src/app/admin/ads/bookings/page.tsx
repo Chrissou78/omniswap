@@ -4,6 +4,16 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
+type BookingStatus =
+  | 'PENDING_PAYMENT'
+  | 'PENDING_APPROVAL'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'ACTIVE'
+  | 'COMPLETED'
+  | 'CANCELLED'
+  | 'REFUNDED';
+
 interface AdBooking {
   id: string;
   advertiserName: string;
@@ -13,11 +23,30 @@ interface AdBooking {
   startDate: string;
   endDate: string;
   totalPriceUsd: number;
-  platformFeeUsd: number;
-  status: 'PENDING' | 'APPROVED' | 'ACTIVE' | 'COMPLETED' | 'REJECTED' | 'CANCELLED';
+  paymentStatus: string;
+  status: BookingStatus;
   impressions: number;
   clicks: number;
   createdAt: string;
+}
+
+/** Map the real AdBooking API row onto this page's view model. */
+function toViewModel(row: any): AdBooking {
+  return {
+    id: row.id,
+    advertiserName: row.companyName || row.contactName || row.email || 'Unknown',
+    slotName: row.slot?.name ?? 'Unknown slot',
+    imageUrl: row.imageUrl ?? '',
+    targetUrl: row.targetUrl ?? '',
+    startDate: row.startDate,
+    endDate: row.endDate,
+    totalPriceUsd: row.finalPrice ?? 0,
+    paymentStatus: row.paymentStatus ?? 'UNPAID',
+    status: row.status,
+    impressions: row.impressions ?? 0,
+    clicks: row.clicks ?? 0,
+    createdAt: row.createdAt,
+  };
 }
 
 export default function AdBookingsPage() {
@@ -32,13 +61,10 @@ export default function AdBookingsPage() {
 
   const loadBookings = async () => {
     try {
-      await new Promise((r) => setTimeout(r, 500));
-      setBookings([
-        { id: '1', advertiserName: 'DeFi Protocol', slotName: 'Header Banner', imageUrl: '', targetUrl: 'https://defi.com', startDate: '2026-01-20', endDate: '2026-01-27', totalPriceUsd: 350, platformFeeUsd: 175, status: 'ACTIVE', impressions: 45230, clicks: 892, createdAt: '2026-01-18' },
-        { id: '2', advertiserName: 'NFT Market', slotName: 'Sidebar', imageUrl: '', targetUrl: 'https://nft.io', startDate: '2026-01-22', endDate: '2026-01-29', totalPriceUsd: 210, platformFeeUsd: 105, status: 'APPROVED', impressions: 0, clicks: 0, createdAt: '2026-01-20' },
-        { id: '3', advertiserName: 'Crypto Wallet', slotName: 'Swap Widget', imageUrl: '', targetUrl: 'https://wallet.com', startDate: '2026-01-10', endDate: '2026-01-17', totalPriceUsd: 525, platformFeeUsd: 262.5, status: 'COMPLETED', impressions: 128500, clicks: 3420, createdAt: '2026-01-08' },
-        { id: '4', advertiserName: 'Token Launch', slotName: 'Header Banner', imageUrl: '', targetUrl: 'https://token.xyz', startDate: '2026-01-25', endDate: '2026-02-01', totalPriceUsd: 350, platformFeeUsd: 175, status: 'PENDING', impressions: 0, clicks: 0, createdAt: '2026-01-21' },
-      ]);
+      const res = await fetch('/api/admin/ads/bookings');
+      if (!res.ok) throw new Error('Failed to fetch bookings');
+      const rows = await res.json();
+      setBookings(Array.isArray(rows) ? rows.map(toViewModel) : []);
     } catch (error) {
       console.error('Failed to load bookings:', error);
     } finally {
@@ -47,12 +73,14 @@ export default function AdBookingsPage() {
   };
 
   const statusColors: Record<string, string> = {
-    PENDING: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400',
+    PENDING_PAYMENT: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400',
+    PENDING_APPROVAL: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400',
     APPROVED: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400',
     ACTIVE: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400',
     COMPLETED: 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-400',
     REJECTED: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400',
     CANCELLED: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400',
+    REFUNDED: 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400',
   };
 
   const filteredBookings = bookings.filter((booking) => {
@@ -66,7 +94,9 @@ export default function AdBookingsPage() {
   const stats = {
     total: bookings.length,
     active: bookings.filter((b) => b.status === 'ACTIVE').length,
-    revenue: bookings.filter((b) => ['ACTIVE', 'COMPLETED'].includes(b.status)).reduce((sum, b) => sum + b.platformFeeUsd, 0),
+    revenue: bookings
+      .filter((b) => b.paymentStatus === 'PAID')
+      .reduce((sum, b) => sum + b.totalPriceUsd, 0),
   };
 
   if (isLoading) {
@@ -129,11 +159,14 @@ export default function AdBookingsPage() {
           className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
         >
           <option value="all">All Status</option>
-          <option value="PENDING">Pending</option>
+          <option value="PENDING_PAYMENT">Pending Payment</option>
+          <option value="PENDING_APPROVAL">Pending Approval</option>
           <option value="APPROVED">Approved</option>
           <option value="ACTIVE">Active</option>
           <option value="COMPLETED">Completed</option>
           <option value="REJECTED">Rejected</option>
+          <option value="CANCELLED">Cancelled</option>
+          <option value="REFUNDED">Refunded</option>
         </select>
       </div>
 
@@ -162,12 +195,22 @@ export default function AdBookingsPage() {
                   </td>
                   <td className="px-4 py-4 text-sm text-gray-700 dark:text-gray-300">{booking.slotName}</td>
                   <td className="px-4 py-4">
-                    <p className="text-sm text-gray-900 dark:text-white">{booking.startDate}</p>
-                    <p className="text-xs text-gray-500">to {booking.endDate}</p>
+                    <p className="text-sm text-gray-900 dark:text-white">
+                      {new Date(booking.startDate).toLocaleDateString()}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      to {new Date(booking.endDate).toLocaleDateString()}
+                    </p>
                   </td>
                   <td className="px-4 py-4">
                     <p className="text-sm font-medium text-gray-900 dark:text-white">${booking.totalPriceUsd}</p>
-                    <p className="text-xs text-green-600">+${booking.platformFeeUsd} fee</p>
+                    <p
+                      className={`text-xs ${
+                        booking.paymentStatus === 'PAID' ? 'text-green-600' : 'text-gray-500'
+                      }`}
+                    >
+                      {booking.paymentStatus}
+                    </p>
                   </td>
                   <td className="px-4 py-4">
                     <p className="text-sm text-gray-900 dark:text-white">{booking.impressions.toLocaleString()} views</p>

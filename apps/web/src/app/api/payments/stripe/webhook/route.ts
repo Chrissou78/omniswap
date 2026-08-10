@@ -1,6 +1,7 @@
 // apps/web/src/app/api/payments/stripe/webhook/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
+import { prisma } from '@/lib/prisma';
 
 export async function POST(request: NextRequest) {
   try {
@@ -29,29 +30,65 @@ export async function POST(request: NextRequest) {
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
-        console.log('Payment completed:', session.id);
-        
-        // Extract metadata
-        const metadata = session.metadata || {};
-        
-        // TODO: Update your database based on metadata
-        // For example, if metadata contains { type: 'ad_booking', bookingId: '123' }
-        // you would mark that booking as paid
-        
-        if (metadata.type === 'ad_booking' && metadata.bookingId) {
-          // await prisma.adBooking.update({ where: { id: metadata.bookingId }, data: { status: 'PAID' } });
-          console.log('Ad booking paid:', metadata.bookingId);
-        } else if (metadata.type === 'token_listing' && metadata.listingId) {
-          // await prisma.tokenListing.update({ where: { id: metadata.listingId }, data: { status: 'PAID' } });
-          console.log('Token listing paid:', metadata.listingId);
+
+        if (session.payment_status !== 'paid') {
+          console.warn(`Session ${session.id} completed but payment_status is "${session.payment_status}"`);
+          break;
         }
-        
+
+        // Stripe's webhook - not the browser redirect - is the source of truth
+        // for payment completion. Rows created before checkout carry their id in
+        // the session metadata so we can settle them here.
+        const metadata = session.metadata || {};
+
+        if (metadata.type === 'ad_booking' && metadata.bookingId) {
+          const settings = await prisma.platformSettings.findUnique({ where: { id: 'default' } });
+          await prisma.adBooking.update({
+            where: { id: metadata.bookingId },
+            data: {
+              paymentStatus: 'PAID',
+              paidAt: new Date(),
+              paymentTxHash: session.id,
+              paymentChainId: 'stripe',
+              paymentMethod: 'USD',
+              status: settings?.adRequiresApproval ? 'PENDING_APPROVAL' : 'APPROVED',
+            },
+          });
+        } else if (metadata.type === 'token_listing' && metadata.listingId) {
+          await prisma.tokenListingRequest.update({
+            where: { id: metadata.listingId },
+            data: {
+              paymentStatus: 'PAID',
+              paidAt: new Date(),
+              paymentTxHash: session.id,
+              paymentChainId: 'stripe',
+              paymentMethod: 'USD',
+              status: 'PENDING_REVIEW',
+            },
+          });
+        } else {
+          console.warn(`Session ${session.id} paid but metadata had no bookingId/listingId to settle`, metadata);
+        }
+
         break;
       }
-      
+
       case 'checkout.session.expired': {
         const session = event.data.object as Stripe.Checkout.Session;
-        console.log('Payment expired:', session.id);
+        const metadata = session.metadata || {};
+
+        // Release the pending row so the slot/token isn't blocked forever.
+        if (metadata.type === 'ad_booking' && metadata.bookingId) {
+          await prisma.adBooking.updateMany({
+            where: { id: metadata.bookingId, paymentStatus: { not: 'PAID' } },
+            data: { status: 'CANCELLED', paymentStatus: 'FAILED' },
+          });
+        } else if (metadata.type === 'token_listing' && metadata.listingId) {
+          await prisma.tokenListingRequest.updateMany({
+            where: { id: metadata.listingId, paymentStatus: { not: 'PAID' } },
+            data: { status: 'CANCELLED', paymentStatus: 'FAILED' },
+          });
+        }
         break;
       }
       
