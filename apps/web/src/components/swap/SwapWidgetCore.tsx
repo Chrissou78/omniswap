@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useMemo, useRef, useTransition } from 'react';
-import { useAccount, useSignTypedData } from 'wagmi';
+import { useAccount, useSignTypedData, useSendTransaction } from 'wagmi';
 import { useWallet as useSolanaWallet } from '@solana/wallet-adapter-react';
 import { Connection, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { SuiClient } from '@mysten/sui/client';
 import { compareMexcRoute } from '@/services/mexcService';
+import { buildRealSwapPlan, waitForRealReceipt } from './services/realSwapExecutor';
 import { PLATFORM_FEES } from '@/config/fees';
 import { getChainRpc } from '@/lib/chain-config';
 
@@ -546,6 +547,7 @@ export function SwapWidgetCore() {
   const [outputAmount, setOutputAmount] = useState('');
   const [slippage, setSlippage] = useState('0.5');
   const [isSwapping, setIsSwapping] = useState(false);
+  const [swapError, setSwapError] = useState<string | null>(null);
 
   // Custom Token State
   const [customTokens, setCustomTokens] = useState<CustomToken[]>(() => {
@@ -608,6 +610,7 @@ export function SwapWidgetCore() {
   const { publicKey: solanaPublicKey, connected: solanaConnected } = useSolanaWallet();
   const { suiAddress, suiConnected } = useSuiWallet();
   const { signTypedDataAsync } = useSignTypedData();
+  const { sendTransactionAsync } = useSendTransaction();
 
   // Non-EVM Balances
   const [solanaBalances, setSolanaBalances] = useState<TokenBalances>({});
@@ -1265,33 +1268,62 @@ export function SwapWidgetCore() {
     setSelectedRoute(route);
   };
 
+  // Real swap execution is currently only wired up for same-chain EVM-to-EVM
+  // swaps via 1inch/0x. Cross-chain routing, Solana, Sui, the gasless
+  // "delegated" relay, and the CEX "alternate" route are not yet implemented
+  // for real execution — the button is disabled with a "Coming soon" state
+  // for those cases (see getButtonText/disabled below) rather than faking success.
+  const canExecuteRealSwap = useMemo(() => {
+    return (
+      selectedRoute === 'direct' &&
+      inputChain.type === 'evm' &&
+      outputChain.type === 'evm' &&
+      inputChain.id === outputChain.id &&
+      !!evmAddress
+    );
+  }, [selectedRoute, inputChain.type, inputChain.id, outputChain.type, outputChain.id, evmAddress]);
+
   const handleSwap = async () => {
     if (!inputToken || !outputToken || !inputAmount || !outputAmount) return;
+    if (!canExecuteRealSwap || !evmAddress) return; // button should already be disabled in this case
 
     setIsSwapping(true);
+    setSwapError(null);
 
     try {
-      if (selectedRoute === 'delegated' && delegatedRouteOption) {
-        console.log('[Swap] Executing delegated/gasless swap...');
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-        console.log('[Swap] Delegated swap completed (demo)');
-        
-      } else if (selectedRoute === 'alternate' && alternateRouteOption) {
-        console.log('[Swap] Executing CEX route...');
-        await new Promise((resolve) => setTimeout(resolve, 3000));
-        
-      } else {
-        console.log('[Swap] Executing direct route...');
-        await new Promise((resolve) => setTimeout(resolve, 2000));
+      const chainIdNum = typeof inputChain.id === 'number' ? inputChain.id : parseInt(inputChain.id as string, 10);
+
+      const plan = await buildRealSwapPlan({
+        chainId: chainIdNum,
+        fromTokenAddress: inputToken.address,
+        toTokenAddress: outputToken.address,
+        amount: inputAmount,
+        fromDecimals: inputToken.decimals,
+        slippagePercent: parseFloat(slippage) || 0.5,
+        userAddress: evmAddress as `0x${string}`,
+      });
+
+      if (plan.approveTx) {
+        const approveHash = await sendTransactionAsync({
+          chainId: chainIdNum,
+          to: plan.approveTx.to,
+          data: plan.approveTx.data,
+          value: plan.approveTx.value,
+        });
+        await waitForRealReceipt(chainIdNum, approveHash);
       }
 
-      let userAddress = '';
-      if (inputChain.type === 'solana' && solanaPublicKey) {
-        userAddress = solanaPublicKey.toString();
-      } else if (inputChain.type === 'sui' && suiAddress) {
-        userAddress = suiAddress;
-      } else if (evmAddress) {
-        userAddress = evmAddress;
+      const swapHash = await sendTransactionAsync({
+        chainId: chainIdNum,
+        to: plan.swapTx.to,
+        data: plan.swapTx.data,
+        value: plan.swapTx.value,
+        gas: plan.swapTx.gas,
+      });
+      const receipt = await waitForRealReceipt(chainIdNum, swapHash);
+
+      if (receipt.status !== 'success') {
+        throw new Error('Transaction reverted on-chain');
       }
 
       const fromAmountUsd = parseFloat(inputAmount) * (inputPrice?.priceUsd || 1);
@@ -1306,15 +1338,11 @@ export function SwapWidgetCore() {
         toAmount: outputAmount,
         fromAmountUsd,
         toAmountUsd,
-        userAddress,
-        txHash: `0x${Math.random().toString(16).slice(2)}`,
+        userAddress: evmAddress,
+        txHash: swapHash, // real, on-chain transaction hash
         status: 'completed',
         route: selectedRoute,
-        platformFeeUsd: selectedRoute === 'direct' 
-          ? directRouteOption?.platformFeeUsd 
-          : selectedRoute === 'delegated'
-          ? delegatedRouteOption?.totalFeeUsd
-          : alternateRouteOption?.platformFeeUsd,
+        platformFeeUsd: directRouteOption?.platformFeeUsd,
         timestamp: Date.now(),
       });
 
@@ -1325,8 +1353,9 @@ export function SwapWidgetCore() {
         setDisplayInputValueUsd(null);
         setDisplayOutputValueUsd(null);
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Swap failed:', error);
+      setSwapError(error?.shortMessage || error?.message || 'Swap failed. Please try again.');
     } finally {
       setIsSwapping(false);
     }
@@ -1347,24 +1376,13 @@ export function SwapWidgetCore() {
   const getButtonText = () => {
     if (!isConnected) return 'Connect Wallet';
     if (!inputAmount) return 'Enter Amount';
-    if (isSwapping) {
-      if (selectedRoute === 'delegated') return 'Signing...';
-      if (selectedRoute === 'alternate') return 'Processing...';
-      return 'Swapping...';
-    }
-    if (selectedRoute === 'delegated') return 'Sign & Swap (Gasless)';
-    if (selectedRoute === 'alternate') return 'Execute Trade';
+    if (isSwapping) return 'Swapping...';
+    if (!canExecuteRealSwap) return 'Coming Soon';
     return 'Swap';
   };
 
   const getButtonClass = () => {
     const base = 'w-full mt-4 py-4 font-bold rounded-xl transition-all duration-200 disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed text-white transform active:scale-[0.98]';
-    if (selectedRoute === 'delegated') {
-      return `${base} bg-green-600 hover:bg-green-700`;
-    }
-    if (selectedRoute === 'alternate') {
-      return `${base} bg-purple-600 hover:bg-purple-700`;
-    }
     return `${base} bg-blue-600 hover:bg-blue-700`;
   };
 
@@ -1876,7 +1894,14 @@ export function SwapWidgetCore() {
         {/* Swap Button */}
         <button
           onClick={handleSwap}
-          disabled={!isConnected || !inputAmount || !outputAmount || isSwapping || outputAmount === '...'}
+          disabled={
+            !isConnected ||
+            !inputAmount ||
+            !outputAmount ||
+            isSwapping ||
+            outputAmount === '...' ||
+            (!!inputAmount && !!outputAmount && !canExecuteRealSwap)
+          }
           className={getButtonClass()}
         >
           {isSwapping ? (
@@ -1891,6 +1916,20 @@ export function SwapWidgetCore() {
             getButtonText()
           )}
         </button>
+
+        {!canExecuteRealSwap && isConnected && inputAmount && outputAmount && outputAmount !== '...' && (
+          <p className="mt-2 text-xs text-center text-amber-600 dark:text-amber-400">
+            {inputChain.type !== 'evm' || outputChain.type !== 'evm'
+              ? 'Live swaps are only available for EVM chains right now — Solana and Sui support is coming soon.'
+              : inputChain.id !== outputChain.id
+              ? 'Cross-chain swaps are coming soon — live trading currently supports same-chain swaps only.'
+              : 'This route is coming soon — select "Direct (DEX)" above for live trading.'}
+          </p>
+        )}
+
+        {swapError && (
+          <p className="mt-2 text-xs text-center text-red-600 dark:text-red-400">{swapError}</p>
+        )}
       </div>
 
 
